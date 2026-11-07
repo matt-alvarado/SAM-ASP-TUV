@@ -1,0 +1,11 @@
+# Build outputs (see build_ifx.sh and Build)
+/_build/
+/OBJ
+/OUT_2D
+/OUT_3D
+/OUT_MOMENTS
+/OUT_STAT
+/OUT_MOVIES
+/RESTART
+/SAM_*_w_aero
+/MICRO_RAD_OPTIONS.new

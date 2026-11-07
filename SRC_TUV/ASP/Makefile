@@ -7,16 +7,21 @@ SHELL = /bin/sh
 ## === Define files and directories
 ##
 
-ASP_LIB = libAspLibrary.a
+# Source tree defaults to the directory holding this Makefile.
+# Build outputs (objects, .mod files, library) default to the same tree
+# but can be redirected with ASP_BUILD_DIR (run make from that directory), e.g.
+#   cd build && make -f .../SRC_TUV/ASP/Makefile all ASP_BUILD_DIR=$PWD ASP_FC=ifx
+ASP_DIR ?= $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+ASP_BUILD_DIR ?= $(ASP_DIR)
+ASP_LIB = $(ASP_BUILD_DIR)/libAspLibrary.a
 ASP_INCLUDES_DIR = $(ASP_DIR)/includes
-ASP_DIR = /nas/data_cellar/rotor/data/p2033/SAM-ASP_tuv/SRC_TUV/ASP/
 AR = ar
 AR_FLAGS = -rv
 
 PRNTDIR = $(ASP_DIR)/OUTPUT/
 INCDIR  = $(ASP_DIR)/INCLUDE/
 EXEDIR  = $(ASP_DIR)
-MODULES_OUTPUT_DIR = $(ASP_DIR)/ModuleFiles/
+MODULES_OUTPUT_DIR = $(ASP_BUILD_DIR)/ModuleFiles/
 
 SOURCEDIR = $(ASP_DIR)/src/
 CHEMDIR = $(ASP_DIR)/src/Chemistry/
@@ -28,7 +33,7 @@ INFDIR = $(ASP_DIR)/src/InfrastructuralCode/
 PARTDIR = $(ASP_DIR)/src/LagrangianParticles/
 OUTPUTDIR = $(ASP_DIR)/src/OutputRoutines/
 UNIFACDIR = $(ASP_DIR)/src/UNIFAC/
-OBJDIR = $(ASP_DIR)/ObjectFiles/
+OBJDIR = $(ASP_BUILD_DIR)/ObjectFiles/
 
 FILES	= $(SOURCEDIR)ModelParameters.f90 \
 	  $(SOURCEDIR)ReadInputDeck.f90  \
@@ -103,11 +108,19 @@ FILESDUMP = asp
 
 # Compile command -- single processor
 
-FC = ifort -DIFORT -fp-stack-check -fp-model source
+# Compiler: ifort by default; set ASP_FC=ifx for the Intel oneAPI compiler.
+# (FC has a built-in make default, so a separate name is used.)
+ASP_FC ?= ifort
+ifeq ($(ASP_FC),ifx)
+  ASP_FC_OPTS ?= -DIFORT -fp-model=precise
+else
+  ASP_FC_OPTS ?= -DIFORT -fp-stack-check -fp-model source
+endif
+FC = $(ASP_FC) $(ASP_FC_OPTS)
 
 LDFLAGS := -Wl,-zmuldefs
 
-FFLAGS :=  -fpp -FI -O -r8 -prec_div -g -traceback \
+FFLAGS :=  -fpp -FI -O -r8 -prec-div -g -traceback \
 	   -I$(MODULES_OUTPUT_DIR) -module $(MODULES_OUTPUT_DIR)
 
 #FFLAGS :=  -fpp -FI -r8 -prec_div -g -O2 -fpe0 -debug extended -traceback \

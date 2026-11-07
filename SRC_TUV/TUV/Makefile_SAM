@@ -10,8 +10,15 @@
 
 EXC = tuv_SAM
 
-TUV_LIB = libTuvLibrary.a
-TUV_DIR = /nas/data_cellar/rotor/data/p2033/SAM-ASP_tuv/SRC_TUV/ASP/
+# Source tree defaults to the directory holding this Makefile. Objects and
+# the library default to the same directory but can be redirected with
+# TUV_BUILD_DIR (run make from that directory), e.g.
+#   cd build && make -f .../SRC_TUV/TUV/Makefile_SAM all TUV_BUILD_DIR=$PWD TUV_FC=ifx
+TUV_DIR ?= $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+TUV_BUILD_DIR ?= $(TUV_DIR)
+TUV_LIB = $(TUV_BUILD_DIR)/libTuvLibrary.a
+vpath %.f $(TUV_DIR)
+vpath params $(TUV_DIR)
 AR = ar
 AR_FLAGS = -rv
 
@@ -41,7 +48,8 @@ FOBJS = numer.o functs.o orbit.o terint.o
 # FC   : FORTRAN compiler 
 #        Linux users:  try FC = g77
 #        Cray users :  try FC = f90
- FC = ifort
+ TUV_FC ?= ifort
+ FC = $(TUV_FC)
 
 # FFLAGS : command line options to compiler call (if not set, default is
 #          probably some basic optimization level)
@@ -59,7 +67,7 @@ $(EXC):		$(FOBJS) $(USE_INCL)
 $(USE_INCL):	$(INCLUDES)
 
 .f.o:		
-		$(FC) $(FFLAGS) -c $*.f
+		$(FC) $(FFLAGS) -I$(TUV_DIR) -c $<
 
 clean:		
 		rm -f core $(EXC) $(USE_INCL) $(FOBJS)

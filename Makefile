@@ -16,37 +16,47 @@ PLATFORM := $(shell uname -s)
 #----------------------------------
 #HOSTNAME = $(shell hostname)
 #ifeq ($(HOSTNAME),rotor)
-  TUV_SRC_DIR = /nas/data_cellar/rotor/data/p2033/SAM-ASP_tuv/SRC_TUV/TUV
+  # Every setting below can be overridden from the environment or the make
+  # command line (see /opt/samasp-env.sh for an ifx + Open MPI example).
+  # The defaults reproduce the original rotor build.
+  # SAM_DIR is set by the Build script to the top of this repository.
+  TUV_SRC_DIR ?= $(SAM_DIR)/SRC_TUV/TUV
+  ASP_SRC_DIR ?= $(SAM_DIR)/SRC_TUV/ASP
 
-  ASP_SRC_DIR = /nas/data_cellar/rotor/data/p2033/SAM-ASP_tuv/SRC_TUV/ASP
-
-  ASP_LIBRARY_DIR = $(ASP_SRC_DIR)
+  # Where libAspLibrary.a + ModuleFiles/ and libTuvLibrary.a were built
+  ASP_LIBRARY_DIR ?= $(ASP_SRC_DIR)
+  TUV_LIBRARY_DIR ?= $(TUV_SRC_DIR)
 
   ##rotor##LIB_MPI = /rotor/data/p1808/CMAQv5.0.1/lib/x86_64/ifort/mpich/lib -lmpi -lrdmacm -libumad -lrt -lpthread -libverbs -ldl -lxmpi
-  LIB_MPI = /usr/lib64/mpich-3.2/lib -lmpi -lrdmacm -libumad -lrt -lpthread -libverbs -ldl -lmpifort
+  LIB_MPI ?= /usr/lib64/mpich-3.2/lib -lmpi -lrdmacm -libumad -lrt -lpthread -libverbs -ldl -lmpifort
   ##rotor##INC_MPI =  /rotor/data/p1808/CMAQv5.0.1/lib/x86_64/ifort/mpich/include
-  INC_MPI = /usr/include/mpich-3.2-x86_64
+  INC_MPI ?= /usr/include/mpich-3.2-x86_64
   ##rotor##INC_NETCDF = /rotor/data/p1808/CMAQv5.0.1/lib/x86_64/ifort/netcdf/include
-  INC_NETCDF = /usr/include
+  INC_NETCDF ?= /usr/include
 
   ##rotor##LIB_NETCDF = /rotor/data/p1808/CMAQv5.0.1/lib/x86_64/ifort/netcdf/lib -lnetcdff -lnetcdf -lnetcdf
-  LIB_NETCDF = /usr/lib64 -lnetcdff -lnetcdf -lnetcdf
+  LIB_NETCDF ?= /usr/lib64 -lnetcdff -lnetcdf -lnetcdf
 
   ##rotor##HDF5_HL =  /usr/local/hdf5/1.8.6/intel/lib -lhdf5_hl -lhdf5
-  HDF5_HL = /usr/lib64 -lhdf5_hl -lhdf5
+  HDF5_HL ?= /usr/lib64 -lhdf5_hl -lhdf5
 
   ##rotor##Z =  /usr/local/zlib/1.2.5/intel/lib -lz -lm -lhdf5_hl -lhdf5 -lz
-  Z =  /usr/lib64 -lz -lm -lhdf5_hl -lhdf5 -lz
+  Z ?=  /usr/lib64 -lz -lm -lhdf5_hl -lhdf5 -lz
 
-  FF77 = ifort -c -fixed -extend_source
-  FF90 = ifort -c -free
-  FFLAGS = -I$(INC_NETCDF) -I$(INC_MPI) -g -O2 -pad -I$(ASP_LIBRARY_DIR)/ModuleFiles 
+  # Compilers (FC/CC have built-in make defaults, so separate names are used)
+  SAM_FC ?= ifort
+  SAM_CC ?= icc
+  SAM_FFLAGS_EXTRA ?= -pad
+  FF77 = $(SAM_FC) -c -fixed -extend_source
+  FF90 = $(SAM_FC) -c -free
+  FFLAGS = -I$(INC_NETCDF) -I$(INC_MPI) -g -O2 $(SAM_FFLAGS_EXTRA) -I$(ASP_LIBRARY_DIR)/ModuleFiles 
 #  FFLAGS = -I$(INC_NETCDF) -I$(INC_MPI) -g -O2 -pad -fpe0 -g -traceback -debug extended -I$(ASP_LIBRARY_DIR)/ModuleFiles #AD DEBUG
 
-  LD = ifort
+  LD = $(SAM_FC)
   LDFLAGS = -L$(LIB_MPI) -L$(LIB_NETCDF) -L$(HDF5_HL) -L$(Z)
-  LDFLAGS += -L${ASP_SRC_DIR} -lAspLibrary -L${TUV_SRC_DIR} -lTuvLibrary
-  CC = icc -c -DLINUX
+  LDFLAGS += -L${ASP_LIBRARY_DIR} -lAspLibrary -L${TUV_LIBRARY_DIR} -lTuvLibrary
+  LDFLAGS += $(SAM_LDFLAGS_EXTRA)
+  CC = $(SAM_CC) -c -DLINUX
 #endif 
 
 

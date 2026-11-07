@@ -5,6 +5,7 @@ $Id: t_stop.c,v 1.1.22.1 2002/06/21 05:45:16 erik Exp $
 #include <sys/time.h>       /* gettimeofday */
 #include <unistd.h>         /* gettimeofday */
 #include <string.h>         /* strcmp (via STRMATCH) */
+#include <stdio.h>          /* printf */
 
 #include <gpt.h>
 
