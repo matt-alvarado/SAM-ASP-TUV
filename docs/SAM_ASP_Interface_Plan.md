@@ -307,3 +307,21 @@ species in `GasPhaseChems.in`: outputs must still be labelled correctly.
   these species.
   They are currently set in both TUV4SAMASP.f and tracers.f90; phase 3
   should keep these definitions and set them in one place.
+
+**Phase 3 (photolysis by reaction label) — done**
+- `SRC_TUV/ASP/InorganicInputDecks/PhotoMap.in`: one line per source,
+  `ASP column ; scale ; TUV reaction label`; it reproduces the old `sammap`
+  table and the derived columns 49–51.
+- `SRC_TUV/samasp_photo.f90` reads it; TUV4SAMASP.f returns the J-values and
+  labels of its selected reactions (no `sammap`, no 49–51 assignments, no
+  per-call debug prints); `tracers.f90` sizes `PhotoArr`/`PhotolysisRates`
+  by the number of ASP columns; J-value outputs are chosen by TUV label.
+- common_ASP (d038ff2): `PhotoRates` is allocated with `HowManyPhotoRxns`
+  columns read from `PhotoRates.in` (rows stay 96 = 24 h at 15 min).
+- Tested: daylight `asptest` output (3D and statistics files) is
+  byte-identical to the run before phase 3. Start-up stops with a clear
+  message for an unknown TUV label, a column outside `PhotoRates.in`, and a
+  mechanism photolysis column with no source.
+- To add a photolysis reaction now: add its column to the mechanism and to
+  `PhotoRates.in` (header and data), select the TUV reaction in
+  `TUV/INPUTS/samasp`, and add a `PhotoMap.in` line — no code changes.
