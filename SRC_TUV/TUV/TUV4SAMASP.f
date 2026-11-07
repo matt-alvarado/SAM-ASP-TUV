@@ -1004,6 +1004,9 @@ c            dt_any(iz,iw) = 0.79*aircol(iz) * 2.e-17 ! N2 VUV absorption
          do ij = 1, nj 
             do iz = 1, nz   
                 indmja = sammap(imj(ij))
+                !TUV reactions with no ASP column are mapped to -1;
+                !skip them (writing samvalj(-1,iz) is out of bounds)
+                if (indmja .LT. 1) cycle
                 !Shuttle tuv's valj into the right spot for samasp
                 !which is given by indmja (the sammap index)
                 samvalj(indmja,iz) = samvalj(indmja,iz) 
