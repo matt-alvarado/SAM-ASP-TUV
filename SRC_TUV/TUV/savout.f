@@ -162,7 +162,7 @@
 * output options
 
       INTEGER itfix, izout, iwfix, isfix, ijfix
-      CHARACTER*20 outfil
+      CHARACTER*(*) outfil
       INTEGER iout
 
       LOGICAL lirrad, laflux, lrates, ljvals, lmmech, lzenit
@@ -674,7 +674,7 @@ c     $        STATUS='UNKNOWN')
 
 * output options
 
-      CHARACTER*20 outfil
+      CHARACTER*(*) outfil
       INTEGER iout
 
 *  actinic flux

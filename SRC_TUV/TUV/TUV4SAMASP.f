@@ -743,11 +743,14 @@ c      CALL newlst(ns,slabel,nj,jlabel)
         enddo
       enddo
 
-      !Fix top layer
-      !dtaer(193, iw) = 0.0  
-      dtaer(193, iw) = 1.0E-20 ! MM DEBUG    
+      !Fix top layer, at every wavelength (this used to run after the
+      !iw loop had ended, i.e. with iw = kw+1, out of bounds)
+      do iw = 1, kw
+      !dtaer(193, iw) = 0.0
+      dtaer(193, iw) = 1.0E-20 ! MM DEBUG
       omaer(193,iw) = 1.0
       gaer(193,iw) = 0.0
+      enddo
      
       !do iz = 1, nz
       !  write(*,*) "iz: ", iz
@@ -1001,8 +1004,9 @@ c            dt_any(iz,iw) = 0.79*aircol(iz) * 2.e-17 ! N2 VUV absorption
          samvalj(:,:) = 0.0
          !write(*,*), "TUV4SAMASP samvalj nz levels", nz !AD DEBUG
          !write(*,*), "TUV4SAMASP valj kz levels", kz !AD DEBUG
-         do ij = 1, nj 
-            do iz = 1, nz   
+         !imj holds the nmj selected reactions; nj counts all of them
+         do ij = 1, nmj
+            do iz = 1, nz
                 indmja = sammap(imj(ij))
                 !TUV reactions with no ASP column are mapped to -1;
                 !skip them (writing samvalj(-1,iz) is out of bounds)
