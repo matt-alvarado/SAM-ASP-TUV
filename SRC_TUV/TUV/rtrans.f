@@ -21,7 +21,7 @@
 *        upbeam
 *        zeroal
 *        zeroit
-*        errmsg
+*        ErrMsT
 *        sgbco
 *        sgbfa
 *        sgbsl
@@ -36,13 +36,13 @@
 * and the functions
 *        dref
 *        ratio
-*        wrtbad
-*        wrtdim
-*        tstbad
+*        WrtBaT
+*        WrtDiT
+*        TstBaT
 *        sasum
 *        sdot
 *        isamax
-*        d1mach
+*        D1MACT
 *        r1mach
 *=============================================================================*
 
@@ -886,16 +886,16 @@ c *******************************************************************
 
 
 c +------------------------------------------------------------------+
-c  Calling Tree (omitting calls to ERRMSG):
+c  Calling Tree (omitting calls to ERRMST):
 c  (routines in parentheses are not in this file)
 
 c  DISORT-+-(R1MACH)
 c         +-ZEROIT
-c         +-CHEKIN-+-(WRTBAD)
-c         |        +-(WRTDIM)
+c         +-CHEKIN-+-(WRTBAT)
+c         |        +-(WRTDIT)
 c         |        +-DREF
 c         +-ZEROAL
-c         +-SETDIS-+-QGAUSN (1)-+-(D1MACH)
+c         +-SETDIS-+-QGAUSN (1)-+-(D1MACT)
 c         +-PRTINP
 c         +-LEPOLY see 2
 c         +-SURFAC-+-QGAUSN see 1
@@ -1610,7 +1610,7 @@ c       EVECD :  double precision stand-in for EVEC
 c       EVALD :  double precision stand-in for EVAL
 
 c   Called by- SOLEIG
-c   Calls- D1MACH, ERRMSG
+c   Calls- D1MACT, ERRMST
 c +-------------------------------------------------------------------+
 
 c     .. Scalar Arguments ..
@@ -1633,12 +1633,12 @@ c     .. Local Scalars ..
 c     ..
 c     .. External Functions ..
 
-      DOUBLE PRECISION D1MACH
-      EXTERNAL  D1MACH
+      DOUBLE PRECISION D1MACT
+      EXTERNAL  D1MACT
 c     ..
 c     .. External Subroutines ..
 
-      EXTERNAL  ERRMSG
+      EXTERNAL  ERRMST
 c     ..
 c     .. Intrinsic Functions ..
 
@@ -1650,10 +1650,10 @@ c     ..
 
 
       IER  = 0
-      TOL  = epsilon(4.D0) !D1MACH( 4 ) MJA replace with F90 function
+      TOL  = epsilon(4.D0) !D1MACT( 4 ) MJA replace with F90 function
 
       IF( M.LT.1 .OR. IA.LT.M .OR. IEVEC.LT.M )
-     &    CALL ERRMSG( 'ASYMTX--bad input variable(s)', .TRUE. )
+     &    CALL ERRMST( 'ASYMTX--bad input variable(s)', .TRUE. )
 
 c                           ** Handle 1x1 and 2x2 special cases
 
@@ -1669,7 +1669,7 @@ c                           ** Handle 1x1 and 2x2 special cases
      &              4.*AA( 1, 2 )*AA( 2, 1 )
 
          IF( DISCRI.LT.0.0 )
-     &       CALL ERRMSG( 'ASYMTX--complex evals in 2x2 case',.TRUE. )
+     &       CALL ERRMST( 'ASYMTX--complex evals in 2x2 case',.TRUE. )
 
          SGN  = 1.0
 
@@ -2367,7 +2367,7 @@ c                         ** Put results into output arrays
 
 c           Checks the input dimensions and variables
 
-c   Calls- WRTBAD, WRTDIM, DREF, ERRMSG
+c   Calls- WRTBAT, WRTDIT, DREF, ERRMST
 c   Called by- DISORT
 c --------------------------------------------------------------------
 
@@ -2394,13 +2394,13 @@ c     .. Local Scalars ..
 c     ..
 c     .. External Functions ..
 
-      LOGICAL   WRTBAD, WRTDIM
+      LOGICAL   WRTBAT, WRTDIT
       REAL      DREF
-      EXTERNAL  WRTBAD, WRTDIM, DREF
+      EXTERNAL  WRTBAT, WRTDIT, DREF
 c     ..
 c     .. External Subroutines ..
 
-      EXTERNAL  ERRMSG
+      EXTERNAL  ERRMST
 c     ..
 c     .. Intrinsic Functions ..
 
@@ -2410,30 +2410,30 @@ c     ..
 
       INPERR = .FALSE.
 
-      IF( NLYR.LT.1 ) INPERR = WRTBAD( 'NLYR' )
+      IF( NLYR.LT.1 ) INPERR = WRTBAT( 'NLYR' )
 
-      IF( NLYR.GT.MAXCLY ) INPERR = WRTBAD( 'MAXCLY' )
+      IF( NLYR.GT.MAXCLY ) INPERR = WRTBAT( 'MAXCLY' )
 
       DO 20 LC = 1, NLYR
 
-         IF( DTAUC( LC ).LT.0.0 ) INPERR = WRTBAD( 'DTAUC' )
+         IF( DTAUC( LC ).LT.0.0 ) INPERR = WRTBAT( 'DTAUC' )
 
          IF( SSALB( LC ).LT.0.0 .OR. SSALB( LC ).GT.1.0 )
-     &       INPERR = WRTBAD( 'SSALB' )
+     &       INPERR = WRTBAT( 'SSALB' )
 
          IF( PLANK .AND. IBCND.NE.1 ) THEN
 
             IF( LC.EQ.1 .AND. TEMPER( 0 ).LT.0.0 )
-     &          INPERR = WRTBAD( 'TEMPER' )
+     &          INPERR = WRTBAT( 'TEMPER' )
 
-            IF( TEMPER( LC ).LT.0.0 ) INPERR = WRTBAD( 'TEMPER' )
+            IF( TEMPER( LC ).LT.0.0 ) INPERR = WRTBAT( 'TEMPER' )
 
          END IF
 
          DO 10 K = 0, NSTR
 
             IF( PMOM( K,LC ).LT.-1.0 .OR. PMOM( K,LC ).GT.1.0 )
-     &          INPERR = WRTBAD( 'PMOM' )
+     &          INPERR = WRTBAT( 'PMOM' )
 
    10    CONTINUE
 
@@ -2442,13 +2442,13 @@ c     ..
 
       IF( IBCND.EQ.1 ) THEN
 
-         IF( MAXULV.LT.2 ) INPERR = WRTBAD( 'MAXULV' )
+         IF( MAXULV.LT.2 ) INPERR = WRTBAT( 'MAXULV' )
 
       ELSE IF( USRTAU ) THEN
 
-         IF( NTAU.LT.1 ) INPERR = WRTBAD( 'NTAU' )
+         IF( NTAU.LT.1 ) INPERR = WRTBAT( 'NTAU' )
 
-         IF( MAXULV.LT.NTAU ) INPERR = WRTBAD( 'MAXULV' )
+         IF( MAXULV.LT.NTAU ) INPERR = WRTBAT( 'MAXULV' )
 
          DO 30 LU = 1, NTAU
 
@@ -2456,47 +2456,47 @@ c     ..
      &          UTAU( LU ) = TAUC( NLYR )
 
             IF( UTAU( LU ).LT.0.0 .OR. UTAU( LU ).GT. TAUC( NLYR ) )
-     &          INPERR = WRTBAD( 'UTAU' )
+     &          INPERR = WRTBAT( 'UTAU' )
 
    30    CONTINUE
 
       ELSE
 
-         IF( MAXULV.LT.NLYR + 1 ) INPERR = WRTBAD( 'MAXULV' )
+         IF( MAXULV.LT.NLYR + 1 ) INPERR = WRTBAT( 'MAXULV' )
 
       END IF
 
 
-      IF( NSTR.LT.2 .OR. MOD( NSTR,2 ).NE.0 ) INPERR = WRTBAD( 'NSTR' )
+      IF( NSTR.LT.2 .OR. MOD( NSTR,2 ).NE.0 ) INPERR = WRTBAT( 'NSTR' )
 
 c     IF( NSTR.EQ.2 )
-c    &    CALL ERRMSG( 'CHEKIN--2 streams not recommended;'//
+c    &    CALL ERRMST( 'CHEKIN--2 streams not recommended;'//
 c    &                 ' use specialized 2-stream code instead',.False.)
 
-      IF( NSTR.GT.MAXCMU ) INPERR = WRTBAD( 'MAXCMU' )
+      IF( NSTR.GT.MAXCMU ) INPERR = WRTBAT( 'MAXCMU' )
 
       IF( USRANG ) THEN
 
-         IF( NUMU.LT.0 ) INPERR = WRTBAD( 'NUMU' )
+         IF( NUMU.LT.0 ) INPERR = WRTBAT( 'NUMU' )
 
-         IF( .NOT.ONLYFL .AND. NUMU.EQ.0 ) INPERR = WRTBAD( 'NUMU' )
+         IF( .NOT.ONLYFL .AND. NUMU.EQ.0 ) INPERR = WRTBAT( 'NUMU' )
 
-         IF( NUMU.GT.MAXUMU ) INPERR = WRTBAD( 'MAXUMU' )
+         IF( NUMU.GT.MAXUMU ) INPERR = WRTBAT( 'MAXUMU' )
 
          IF( IBCND.EQ.1 .AND. 2*NUMU.GT.MAXUMU )
-     &       INPERR = WRTBAD( 'MAXUMU' )
+     &       INPERR = WRTBAT( 'MAXUMU' )
 
          DO 40 IU = 1, NUMU
 
             IF( UMU( IU ).LT.-1.0 .OR. UMU( IU ).GT.1.0 .OR.
-     &          UMU( IU ).EQ.0.0 ) INPERR = WRTBAD( 'UMU' )
+     &          UMU( IU ).EQ.0.0 ) INPERR = WRTBAT( 'UMU' )
 
             IF( IBCND.EQ.1 .AND. UMU( IU ).LT.0.0 )
-     &          INPERR = WRTBAD( 'UMU' )
+     &          INPERR = WRTBAT( 'UMU' )
 
             IF( IU.GT.1 ) THEN
 
-               IF( UMU( IU ).LT.UMU( IU-1 ) ) INPERR = WRTBAD( 'UMU' )
+               IF( UMU( IU ).LT.UMU( IU-1 ) ) INPERR = WRTBAT( 'UMU' )
 
             END IF
 
@@ -2504,45 +2504,45 @@ c    &                 ' use specialized 2-stream code instead',.False.)
 
       ELSE
 
-         IF( MAXUMU.LT.NSTR ) INPERR = WRTBAD( 'MAXUMU' )
+         IF( MAXUMU.LT.NSTR ) INPERR = WRTBAT( 'MAXUMU' )
 
       END IF
 
 
       IF( .NOT.ONLYFL .AND. IBCND.NE.1 ) THEN
 
-         IF( NPHI.LE.0 ) INPERR = WRTBAD( 'NPHI' )
+         IF( NPHI.LE.0 ) INPERR = WRTBAT( 'NPHI' )
 
-         IF( NPHI.GT.MAXPHI ) INPERR = WRTBAD( 'MAXPHI' )
+         IF( NPHI.GT.MAXPHI ) INPERR = WRTBAT( 'MAXPHI' )
 
          DO 50 J = 1, NPHI
 
             IF( PHI( J ).LT.0.0 .OR. PHI( J ).GT.360.0 )
-     &          INPERR = WRTBAD( 'PHI' )
+     &          INPERR = WRTBAT( 'PHI' )
 
    50    CONTINUE
 
       END IF
 
 
-      IF( IBCND.LT.0 .OR. IBCND.GT.1 ) INPERR = WRTBAD( 'IBCND' )
+      IF( IBCND.LT.0 .OR. IBCND.GT.1 ) INPERR = WRTBAT( 'IBCND' )
 
       IF( IBCND.EQ.0 ) THEN
 
-         IF( FBEAM.LT.0.0 ) INPERR = WRTBAD( 'FBEAM' )
+         IF( FBEAM.LT.0.0 ) INPERR = WRTBAT( 'FBEAM' )
 
          IF( FBEAM.GT.0.0 .AND. abs(UMU0).GT.1.0 )
-     &       INPERR = WRTBAD( 'UMU0' )
+     &       INPERR = WRTBAT( 'UMU0' )
 
          IF( FBEAM.GT.0.0 .AND. ( PHI0.LT.0.0 .OR.PHI0.GT.360.0 ) )
-     &       INPERR = WRTBAD( 'PHI0' )
+     &       INPERR = WRTBAT( 'PHI0' )
 
-         IF( FISOT.LT.0.0 ) INPERR = WRTBAD( 'FISOT' )
+         IF( FISOT.LT.0.0 ) INPERR = WRTBAT( 'FISOT' )
 
          IF( LAMBER ) THEN
 
             IF( ALBEDO.LT.0.0 .OR. ALBEDO.GT.1.0 )
-     &          INPERR = WRTBAD( 'ALBEDO' )
+     &          INPERR = WRTBAT( 'ALBEDO' )
 
          ELSE
 c                    ** Make sure flux albedo at dense mesh of incident
@@ -2553,7 +2553,7 @@ c                       angles does not assume unphysical values
                FLXALB = DREF( RMU, HL, NSTR )
 
                IF( FLXALB.LT.0.0 .OR. FLXALB.GT.1.0 )
-     &             INPERR = WRTBAD( 'HL' )
+     &             INPERR = WRTBAT( 'HL' )
 
    60       CONTINUE
 
@@ -2563,7 +2563,7 @@ c                       angles does not assume unphysical values
       ELSE IF( IBCND.EQ.1 ) THEN
 
          IF( ALBEDO.LT.0.0 .OR. ALBEDO.GT.1.0 )
-     &       INPERR = WRTBAD( 'ALBEDO' )
+     &       INPERR = WRTBAT( 'ALBEDO' )
 
       END IF
 
@@ -2571,57 +2571,57 @@ c                       angles does not assume unphysical values
       IF( PLANK .AND. IBCND.NE.1 ) THEN
 
          IF( WVNMLO.LT.0.0 .OR. WVNMHI.LE.WVNMLO )
-     &       INPERR = WRTBAD( 'WVNMLO,HI' )
+     &       INPERR = WRTBAT( 'WVNMLO,HI' )
 
-         IF( TEMIS.LT.0.0 .OR. TEMIS.GT.1.0 ) INPERR = WRTBAD( 'TEMIS' )
+         IF( TEMIS.LT.0.0 .OR. TEMIS.GT.1.0 ) INPERR = WRTBAT( 'TEMIS' )
 
-         IF( BTEMP.LT.0.0 ) INPERR = WRTBAD( 'BTEMP' )
+         IF( BTEMP.LT.0.0 ) INPERR = WRTBAT( 'BTEMP' )
 
-         IF( TTEMP.LT.0.0 ) INPERR = WRTBAD( 'TTEMP' )
+         IF( TTEMP.LT.0.0 ) INPERR = WRTBAT( 'TTEMP' )
 
       END IF
 
 
-      IF( ACCUR.LT.0.0 .OR. ACCUR.GT.1.E-2 ) INPERR = WRTBAD( 'ACCUR' )
+      IF( ACCUR.LT.0.0 .OR. ACCUR.GT.1.E-2 ) INPERR = WRTBAT( 'ACCUR' )
 
-      IF( MXCLY.LT.NLYR ) INPERR = WRTDIM( 'MXCLY', NLYR )
+      IF( MXCLY.LT.NLYR ) INPERR = WRTDIT( 'MXCLY', NLYR )
 
       IF( IBCND.NE.1 ) THEN
 
          IF( USRTAU .AND. MXULV.LT.NTAU )
-     &       INPERR = WRTDIM( 'MXULV',NTAU )
+     &       INPERR = WRTDIT( 'MXULV',NTAU )
 
          IF( .NOT.USRTAU .AND. MXULV .LT. NLYR + 1 )
-     &       INPERR = WRTDIM( 'MXULV', NLYR + 1 )
+     &       INPERR = WRTDIT( 'MXULV', NLYR + 1 )
 
       ELSE
 
-         IF( MXULV.LT.2 ) INPERR = WRTDIM( 'MXULV', 2 )
+         IF( MXULV.LT.2 ) INPERR = WRTDIT( 'MXULV', 2 )
 
       END IF
 
-      IF( MXCMU.LT.NSTR ) INPERR = WRTDIM( 'MXCMU', NSTR )
+      IF( MXCMU.LT.NSTR ) INPERR = WRTDIT( 'MXCMU', NSTR )
 
-      IF( USRANG .AND. MXUMU.LT.NUMU ) INPERR = WRTDIM( 'MXUMU', NUMU )
+      IF( USRANG .AND. MXUMU.LT.NUMU ) INPERR = WRTDIT( 'MXUMU', NUMU )
 
       IF( USRANG .AND. IBCND.EQ.1 .AND.MXUMU.LT.2*NUMU )
-     &    INPERR = WRTDIM( 'MXUMU', NUMU )
+     &    INPERR = WRTDIT( 'MXUMU', NUMU )
 
       IF( .NOT.USRANG .AND. MXUMU.LT.NSTR )
-     &    INPERR = WRTDIM( 'MXUMU', NSTR )
+     &    INPERR = WRTDIT( 'MXUMU', NSTR )
 
       IF( .NOT.ONLYFL .AND. IBCND.NE.1 .AND. MXPHI.LT.NPHI )
-     &    INPERR = WRTDIM( 'MXPHI', NPHI )
+     &    INPERR = WRTDIT( 'MXPHI', NPHI )
 
       IF( INPERR )
-     &    CALL ERRMSG( 'DISORT--input and/or dimension errors',.True.)
+     &    CALL ERRMST( 'DISORT--input and/or dimension errors',.True.)
 
       IF( PLANK ) THEN
 
          DO 70 LC = 1, NLYR
 
             IF( ABS( TEMPER( LC ) - TEMPER( LC-1 ) ).GT. 20.0 )
-     &          CALL ERRMSG('CHEKIN--vertical temperature step may'
+     &          CALL ERRMST('CHEKIN--vertical temperature step may'
      &                      // ' be too large for good accuracy',
      &                      .False.)
    70    CONTINUE
@@ -2938,7 +2938,7 @@ c       YLM(l,i) :  l = M to TWONM1, normalized associated Legendre
 c                   polynomials evaluated at argument MU(i)
 
 c   Called by- DISORT, ALBTRN, SURFAC
-c   Calls- ERRMSG
+c   Calls- ERRMST
 c +-------------------------------------------------------------------+
 
 c     .. Parameters ..
@@ -2966,7 +2966,7 @@ c     .. Local Arrays ..
 c     ..
 c     .. External Subroutines ..
 
-      EXTERNAL  ERRMSG
+      EXTERNAL  ERRMST
 c     ..
 c     .. Intrinsic Functions ..
 
@@ -2987,7 +2987,7 @@ c     ..
       END IF
 
       IF( 2*TWONM1.GT.MAXSQT )
-     &    CALL ERRMSG('LEPOLY--need to increase param MAXSQT',.True.)
+     &    CALL ERRMST('LEPOLY--need to increase param MAXSQT',.True.)
 
 
       IF( M.EQ.0 ) THEN
@@ -3381,7 +3381,7 @@ c    X,XI      : successive iterates in cubically-convergent version
 c                of Newtons Method (seeking roots of Legendre poly.)
 
 c   Called by- SETDIS, SURFAC
-c   Calls- D1MACH, ERRMSG
+c   Calls- D1MACT, ERRMST
 c +-------------------------------------------------------------------+
 
 c     .. Scalar Arguments ..
@@ -3401,12 +3401,12 @@ c     .. Local Scalars ..
 c     ..
 c     .. External Functions ..
 
-      DOUBLE PRECISION D1MACH
-      EXTERNAL  D1MACH
+      DOUBLE PRECISION D1MACT
+      EXTERNAL  D1MACT
 c     ..
 c     .. External Subroutines ..
 
-      EXTERNAL  ERRMSG
+      EXTERNAL  ERRMST
 c     ..
 c     .. Intrinsic Functions ..
 
@@ -3421,12 +3421,12 @@ c     ..
       IF( PI.EQ.0.0 ) THEN
 
          PI   = 2.*ASIN( 1.0 )
-         TOL  = 10*epsilon(4.0D0) !10.*D1MACH( 4 ) MJA replace with F90 function
+         TOL  = 10*epsilon(4.0D0) !10.*D1MACT( 4 ) MJA replace with F90 function
 
       END IF
 
 
-      IF( M.LT.1 ) CALL ERRMSG( 'QGAUSN--Bad value of M',.True.)
+      IF( M.LT.1 ) CALL ERRMST( 'QGAUSN--Bad value of M',.True.)
 
       IF( M.EQ.1 ) THEN
 
@@ -3473,7 +3473,7 @@ c                                              ** Check for convergence
          IF( ABS( XI - X ).GT.TOL ) THEN
 
             IF( ITER.GT.MAXIT )
-     &          CALL ERRMSG( 'QGAUSN--max iteration count',.True.)
+     &          CALL ERRMST( 'QGAUSN--max iteration count',.True.)
 
             X  = XI
             GO TO  10
@@ -3542,7 +3542,7 @@ c                TAUCPR      delta-M-scaled optical depth
 c                UTAUPR      delta-M-scaled version of  UTAU
 
 c   Called by- DISORT
-c   Calls- QGAUSN, ERRMSG
+c   Calls- QGAUSN, ERRMST
 c ----------------------------------------------------------------------
 
       INCLUDE 'params'
@@ -3579,7 +3579,7 @@ c     .. Local Scalars ..
 c     ..
 c     .. External Subroutines ..
 
-      EXTERNAL  ERRMSG, QGAUSN
+      EXTERNAL  ERRMST, QGAUSN
 c     ..
 c     .. Intrinsic Functions ..
 
@@ -4092,7 +4092,7 @@ c       GPMIGM  :  (G+) - (G-) (cf. Eqs. SS(10-11))
 c       WKD     :  Scratch array required by ASYMTX
 
 c   Called by- DISORT, ALBTRN
-c   Calls- ASYMTX, ERRMSG
+c   Calls- ASYMTX, ERRMST
 c +-------------------------------------------------------------------+
 
 
@@ -4116,7 +4116,7 @@ c     .. Local Scalars ..
 c     ..
 c     .. External Subroutines ..
 
-      EXTERNAL  ASYMTX, ERRMSG
+      EXTERNAL  ASYMTX, ERRMST
 c     ..
 c     .. Intrinsic Functions ..
 
@@ -4186,7 +4186,7 @@ c                      ** Find (real) eigenvalues and eigenvectors
          WRITE( *, FMT = '(//,A,I4,A)' ) ' ASYMTX--eigenvalue no. ',
      &      IER, '  didnt converge.  Lower-numbered eigenvalues wrong.'
 
-         CALL ERRMSG( 'ASYMTX--convergence problems',.True.)
+         CALL ERRMST( 'ASYMTX--convergence problems',.True.)
 
       END IF
 
@@ -4299,7 +4299,7 @@ c       RCOND    :  Indicator of singularity for CBAND
 c       Z        :  Scratch array required by SGBCO
 
 c   Called by- DISORT
-c   Calls- ZEROIT, SGBCO, ERRMSG, SGBSL
+c   Calls- ZEROIT, SGBCO, ERRMST, SGBSL
 c +-------------------------------------------------------------------+
 
 
@@ -4325,7 +4325,7 @@ c     .. Local Scalars ..
 c     ..
 c     .. External Subroutines ..
 
-      EXTERNAL  ERRMSG, SGBCO, SGBSL, ZEROIT
+      EXTERNAL  ERRMST, SGBCO, SGBSL, ZEROIT
 c     ..
 
 
@@ -4510,7 +4510,7 @@ c                        (CBAND is in LINPACK packed format)
       CALL SGBCO( CBAND, MI9M2, NCOL, NCD, NCD, IPVT, RCOND, Z )
 
       IF( 1.0 + RCOND.EQ.1.0 )
-     &    CALL ERRMSG('SOLVE0--SGBCO says matrix near singular',.FALSE.)
+     &    CALL ERRMST('SOLVE0--SGBCO says matrix near singular',.FALSE.)
 
 c                   ** Solve linear system with coeff matrix CBAND
 c                      and R.H. side(s) B after CBAND has been L-U
@@ -4582,7 +4582,7 @@ c       YLMG   :  Normalized associated Legendre polynomials
 c                   at the NMUG quadrature angles
 
 c   Called by- DISORT
-c   Calls- QGAUSN, LEPOLY, ZEROIT, ERRMSG
+c   Calls- QGAUSN, LEPOLY, ZEROIT, ERRMST
 c +-------------------------------------------------------------------+
 
 c     .. Parameters ..
@@ -4615,7 +4615,7 @@ c     .. Local Arrays ..
 c     ..
 c     .. External Subroutines ..
 
-      EXTERNAL  ERRMSG, LEPOLY, QGAUSN, ZEROIT
+      EXTERNAL  ERRMST, LEPOLY, QGAUSN, ZEROIT
 c     ..
       SAVE      PASS1, GMU, GWT, YLMG
       DATA      PASS1 / .TRUE. /
@@ -4696,7 +4696,7 @@ c                                     properties at computational angles
          IF( MAZIM.EQ.0 ) THEN
 
             IF( NSTR.GT.MAXSTR )
-     &          CALL ERRMSG('SURFAC--parameter MAXSTR too small',.True.)
+     &          CALL ERRMST('SURFAC--parameter MAXSTR too small',.True.)
 
 c                              ** Integrate bidirectional reflectivity
 c                                 at reflection polar angles CMU and
@@ -5145,7 +5145,7 @@ c       IPVT   :  Integer vector of pivot indices required by LINPACK
 c       WK     :  Scratch array required by LINPACK
 
 c   Called by- DISORT
-c   Calls- SGECO, ERRMSG, SGESL
+c   Calls- SGECO, ERRMST, SGESL
 c +-------------------------------------------------------------------+
 
 
@@ -5171,7 +5171,7 @@ c     .. Local Scalars ..
 c     ..
 c     .. External Subroutines ..
 
-      EXTERNAL  ERRMSG, SGECO, SGESL
+      EXTERNAL  ERRMST, SGECO, SGESL
 c     ..
 
 
@@ -5199,7 +5199,7 @@ c                     (NOTE:  ARRAY is destroyed)
       CALL SGECO( ARRAY, MXCMU, NSTR, IPVT, RCOND, WK )
 
 *bm      IF( 1.0 + RCOND.EQ.1.0 )
-*bm     &    CALL ERRMSG('UPBEAM--SGECO says matrix near singular',.FALSE.)
+*bm     &    CALL ERRMST('UPBEAM--SGECO says matrix near singular',.FALSE.)
 *bm
 *bm   replaced original check of RCOND by the following:
 
@@ -5429,7 +5429,7 @@ c       PLM1    P-sub-(L-1)
 c       PLM2    P-sub-(L-2)
 
 c   Called by- CHEKIN
-c   Calls- ERRMSG
+c   Calls- ERRMST
 c +-------------------------------------------------------------------+
 
 c     .. Parameters ..
@@ -5458,7 +5458,7 @@ c     .. Local Arrays ..
 c     ..
 c     .. External Subroutines ..
 
-      EXTERNAL  ERRMSG
+      EXTERNAL  ERRMST
 c     ..
 c     .. Intrinsic Functions ..
 
@@ -5484,10 +5484,10 @@ c     ..
 
 
       IF( NSTR.LT.2 .OR. ABS(MU).GT.1.0 )
-     &    CALL ERRMSG( 'DREF--input argument error(s)',.True. )
+     &    CALL ERRMST( 'DREF--input argument error(s)',.True. )
 
       IF( NSTR.GT.MAXTRM )
-     &    CALL ERRMSG( 'DREF--parameter MAXTRM too small',.True. )
+     &    CALL ERRMST( 'DREF--parameter MAXTRM too small',.True. )
 
 
       DREF  = HL( 0 ) - 2.*HL( 1 )*MU
@@ -5507,7 +5507,7 @@ c                                ** Legendre polynomial recurrence
    20 CONTINUE
 
       IF( DREF.LT.0.0 .OR. DREF.GT.1.0 )
-     &    CALL ERRMSG( 'DREF--albedo value not in (0,1)',.False. )
+     &    CALL ERRMST( 'DREF--albedo value not in (0,1)',.False. )
 
       END
 
@@ -5609,7 +5609,7 @@ c                      ** from A*B because A*B may (over/under)flow
       END IF
 
       END
-      SUBROUTINE  ErrMsg( MESSAG, FATAL )
+      SUBROUTINE  ErrMsT( MESSAG, FATAL )
 
 c        Print out a warning or error message;  abort if error
 c        after making symbolic dump (machine-specific)
@@ -5642,7 +5642,7 @@ c        after making symbolic dump (machine-specific)
      $   'They will no longer be printed  <<<<<<<', // )
       END
 
-      LOGICAL FUNCTION  WrtBad ( VarNam )
+      LOGICAL FUNCTION  WrtBaT ( VarNam )
 
 c          Write names of erroneous variables and return 'TRUE'
 
@@ -5655,16 +5655,16 @@ c                         ( CHARACTER, any length )
       DATA  NumMsg / 0 /,  MaxMsg / 50 /
 
 
-      WrtBad = .TRUE.
+      WrtBaT = .TRUE.
       NumMsg = NumMsg + 1
       WRITE ( *, '(3A)' )  ' ****  Input variable  ', VarNam,
      $                     '  in error  ****'
       IF ( NumMsg.EQ.MaxMsg )
-     $   CALL  ErrMsg ( 'Too many input errors.  Aborting...', .TRUE. )
+     $   CALL  ErrMsT ( 'Too many input errors.  Aborting...', .TRUE. )
       RETURN
       END
 
-      LOGICAL FUNCTION  WrtDim ( DimNam, MinVal )
+      LOGICAL FUNCTION  WrtDiT ( DimNam, MinVal )
 
 c          Write name of too-small symbolic dimension and
 c          the value it should be increased to;  return 'TRUE'
@@ -5680,11 +5680,11 @@ c                        increased (at least)
 
       WRITE ( *, '(3A,I7)' )  ' ****  Symbolic dimension  ', DimNam,
      $                     '  should be increased to at least ', MinVal
-      WrtDim = .TRUE.
+      WrtDiT = .TRUE.
       RETURN
       END
 
-      LOGICAL FUNCTION  TstBad( VarNam, RelErr )
+      LOGICAL FUNCTION  TstBaT( VarNam, RelErr )
 
 c       Write name (VarNam) of variable failing self-test and its
 c       percent error from the correct value;  return  'FALSE'.
@@ -5693,7 +5693,7 @@ c       percent error from the correct value;  return  'FALSE'.
       REAL           RelErr
 
 
-      TstBad = .FALSE.
+      TstBaT = .FALSE.
       WRITE( *, '(/,3A,1P,E11.2,A)' )
      $       ' Output variable ', VarNam,' differed by ', 100.*RelErr,
      $       ' per cent from correct value.  Self-test failed.'
@@ -6862,38 +6862,38 @@ C                         ABS(SX(1+(I-1)*INCX))
 
 	RETURN
 	END
-      FUNCTION D1MACH(i)
+      FUNCTION D1MACT(i)
 
 *-----------------------------------------------------------------------------*
 *= PURPOSE:                                                                  =*
-*= D1MACH calculates various machine constants in single precision.          =*
+*= D1MACT calculates various machine constants in single precision.          =*
 *-----------------------------------------------------------------------------*
 *= PARAMETERS:                                                               =*
 *=   I       -  INTEGER, identifies the machine constant (0<I<5)         (I) =*
-*=   D1MACH  -  REAL, machine constant in single precision               (O) =*
+*=   D1MACT  -  REAL, machine constant in single precision               (O) =*
 *=      I=1     - the smallest non-vanishing normalized floating-point       =*
-*=                power of the radix, i.e., D1MACH=FLOAT(IBETA)**MINEXP      =*
+*=                power of the radix, i.e., D1MACT=FLOAT(IBETA)**MINEXP      =*
 *=      I=2     - the largest finite floating-point number.  In              =*
-*=                particular D1MACH=(1.0-EPSNEG)*FLOAT(IBETA)**MAXEXP        =*
-*=                Note - on some machines D1MACH will be only the            =*
+*=                particular D1MACT=(1.0-EPSNEG)*FLOAT(IBETA)**MAXEXP        =*
+*=                Note - on some machines D1MACT will be only the            =*
 *=                second, or perhaps third, largest number, being            =*
 *=                too small by 1 or 2 units in the last digit of             =*
 *=                the significand.                                           =*
 *=      I=3     - A small positive floating-point number such that           =*
-*=                1.0-D1MACH .NE. 1.0. In particular, if IBETA = 2           =*
-*=                or  IRND = 0, D1MACH = FLOAT(IBETA)**NEGEPS.               =*
-*=                Otherwise,  D1MACH = (IBETA**NEGEPS)/2.  Because           =*
-*=                NEGEPS is bounded below by -(IT+3), D1MACH may not         =*
+*=                1.0-D1MACT .NE. 1.0. In particular, if IBETA = 2           =*
+*=                or  IRND = 0, D1MACT = FLOAT(IBETA)**NEGEPS.               =*
+*=                Otherwise,  D1MACT = (IBETA**NEGEPS)/2.  Because           =*
+*=                NEGEPS is bounded below by -(IT+3), D1MACT may not         =*
 *=                be the smallest number that can alter 1.0 by               =*
 *=                subtraction.                                               =*
 *=      I=4     - the smallest positive floating-point number such           =*
-*=                that  1.0+D1MACH .NE. 1.0. In particular, if either        =*
-*=                IBETA = 2  or  IRND = 0, D1MACH=FLOAT(IBETA)**MACHEP.      =*
-*=                Otherwise, D1MACH=(FLOAT(IBETA)**MACHEP)/2                 =*
+*=                that  1.0+D1MACT .NE. 1.0. In particular, if either        =*
+*=                IBETA = 2  or  IRND = 0, D1MACT=FLOAT(IBETA)**MACHEP.      =*
+*=                Otherwise, D1MACT=(FLOAT(IBETA)**MACHEP)/2                 =*
 *=  (see routine T665D for more information on different constants)          =*
 *-----------------------------------------------------------------------------*
 
-      DOUBLE PRECISION d1mach
+      DOUBLE PRECISION D1MACT
       INTEGER i
    
       LOGICAL doinit
@@ -6909,17 +6909,17 @@ C                         ABS(SX(1+(I-1)*INCX))
            CALL t665d(dmach)
            doinit = .FALSE.
         ENDIF
-        d1mach = dmach(i)
+        D1MACT = dmach(i)
       ELSE
-        WRITE(0,*) '>>> ERROR (D1MACH) <<<  invalid argument'
+        WRITE(0,*) '>>> ERROR (D1MACT) <<<  invalid argument'
         STOP
       ENDIF
 
 *!csm
 *!!! over-ride by sm on 5/26/03.  For some compilers than don't allow
-* calculation of d1mach(4).  Use value found on ACD server.
+* calculation of D1MACT(4).  Use value found on ACD server.
 
-c      if( i .eq. 4) d1mach = 2.22e-15
+c      if( i .eq. 4) D1MACT = 2.22e-15
 
       END
 

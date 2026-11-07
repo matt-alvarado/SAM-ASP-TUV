@@ -206,7 +206,8 @@ END FUNCTION
 
 ! endif
 
-  call InitializeASP(doAerosols)
+  call InitializeASP(doAerosols, DeckDir=trim(asp_deck_dir), &
+                     OutputDir=trim(asp_output_dir))
   call ReadBoundaryDistributionsOrganic
   call PopulateParticlesSectionsRightAway(.TRUE.)
   call SortBoundaryPart

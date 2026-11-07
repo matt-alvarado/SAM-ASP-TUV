@@ -23,21 +23,23 @@ INCDIR  = $(ASP_DIR)/INCLUDE/
 EXEDIR  = $(ASP_DIR)
 MODULES_OUTPUT_DIR = $(ASP_BUILD_DIR)/ModuleFiles/
 
-SOURCEDIR = $(ASP_DIR)/src/
-CHEMDIR = $(ASP_DIR)/src/Chemistry/
-COAGDIR = $(ASP_DIR)/src/Coagulation/
-COMPDIR = $(ASP_DIR)/src/ComputationalSubroutines/
-CONDDIR = $(ASP_DIR)/src/Condensation/
-EULERDIR = $(ASP_DIR)/src/EulerianEnvironment/
-INFDIR = $(ASP_DIR)/src/InfrastructuralCode/
-PARTDIR = $(ASP_DIR)/src/LagrangianParticles/
-OUTPUTDIR = $(ASP_DIR)/src/OutputRoutines/
-UNIFACDIR = $(ASP_DIR)/src/UNIFAC/
+# ASP source: the common_ASP submodule at src/ by default
+ASP_SRC_DIR ?= $(ASP_DIR)/src
+SOURCEDIR = $(ASP_SRC_DIR)/
+CHEMDIR = $(ASP_SRC_DIR)/Chemistry/
+COAGDIR = $(ASP_SRC_DIR)/Coagulation/
+COMPDIR = $(ASP_SRC_DIR)/ComputationalSubroutines/
+CONDDIR = $(ASP_SRC_DIR)/Condensation/
+EULERDIR = $(ASP_SRC_DIR)/EulerianEnvironment/
+INFDIR = $(ASP_SRC_DIR)/InfrastructuralCode/
+PARTDIR = $(ASP_SRC_DIR)/LagrangianParticles/
+OUTPUTDIR = $(ASP_SRC_DIR)/OutputRoutines/
+UNIFACDIR = $(ASP_SRC_DIR)/UNIFAC/
 OBJDIR = $(ASP_BUILD_DIR)/ObjectFiles/
 
 FILES	= $(SOURCEDIR)ModelParameters.f90 \
 	  $(SOURCEDIR)ReadInputDeck.f90  \
-          $(SOURCEDIR)StepASP.f90 \
+          $(SOURCEDIR)StepASP4SAM.f90 \
 	  $(SOURCEDIR)Time.f90 \
 	  $(SOURCEDIR)EulerianBoxDriver.f90
 
@@ -66,6 +68,8 @@ CHEMINC = $(CHEMDIR)AqPhaseChemistryInits.h  $(CHEMDIR)AqPhaseReactionIntegratio
 COAGINC = $(COAGDIR)CoagulationKernels.h
 
 CONDINC = $(CONDDIR)AqOrgCondensationIntegrator.h \
+          $(CONDDIR)OrgPhaseReactions.h \
+          $(CONDDIR)ParticleAcidity.h \
           $(CONDDIR)binsolu.h \
 	  $(CONDDIR)CondensationInitialization.h  \
           $(CONDDIR)CondensationIntegrator.h \
@@ -132,7 +136,7 @@ OBJECTS :=
 OBJECTS := $(OBJECTS) \
            $(OBJDIR)CDFNor.o $(OBJDIR)indexx.o $(OBJDIR)lsodes.o \
            $(OBJDIR)PPND16.o \
-	   $(OBJDIR)dgaus8.o $(OBJDIR)DMiLay.o
+	   $(OBJDIR)dgaus8.o $(OBJDIR)DMiLay.o $(OBJDIR)MIEV0.o $(OBJDIR)MieSupport.o
 OBJECTS := $(OBJECTS) \
 	   $(OBJDIR)ModelParameters.o \
 	   $(OBJDIR)InfrastructuralCode.o \
@@ -146,7 +150,7 @@ OBJECTS := $(OBJECTS) \
 	   $(OBJDIR)OutputRoutines.o \
 	   $(OBJDIR)Coagulation.o \
 	   $(OBJDIR)ReadInputDeck.o \
-	   $(OBJDIR)StepASP.o \
+	   $(OBJDIR)StepASP4SAM.o \
            $(OBJDIR)EulerianBoxDriver.o
 OBJECTS := $(OBJECTS) \
            $(OBJDIR)opkda2.o \
@@ -156,7 +160,7 @@ OBJECTS := $(OBJECTS) \
 EXEOBJECTS := $(OBJECTS) $(OBJDIR)DevelopmentDriver.o	
 
 # === Modules: 0 grid define; 1 essential; d type define; s all
-MODASP := $(OBJDIR)DMiLay.o $(OBJDIR)CDFNor.o $(OBJDIR)indexx.o $(OBJDIR)lsodes.o \
+MODASP := $(OBJDIR)DMiLay.o $(OBJDIR)MIEV0.o $(OBJDIR)MieSupport.o $(OBJDIR)CDFNor.o $(OBJDIR)indexx.o $(OBJDIR)lsodes.o \
            $(OBJDIR)PPND16.o \
 	   $(OBJDIR)dgaus8.o \
 	   $(OBJDIR)ModelParameters.o \
@@ -171,7 +175,7 @@ MODASP := $(OBJDIR)DMiLay.o $(OBJDIR)CDFNor.o $(OBJDIR)indexx.o $(OBJDIR)lsodes.
 	   $(OBJDIR)OutputRoutines.o \
 	   $(OBJDIR)Coagulation.o \
 	   $(OBJDIR)ReadInputDeck.o \
-	   $(OBJDIR)StepASP.o \
+	   $(OBJDIR)StepASP4SAM.o \
            $(OBJDIR)EulerianBoxDriver.o
 
 MODASP := $(MODASP) \
@@ -226,6 +230,12 @@ $(OBJDIR)PPND16.o: $(COMPDIR)PPND16.f
 $(OBJDIR)dgaus8.o: $(COMPDIR)dgaus8.f
 	  $(FC) -c $(FFLAGS) $<
 	  \mv dgaus8.o $(OBJDIR)
+$(OBJDIR)MIEV0.o: $(SOURCEDIR)MIEV0.f
+	  $(FC) -c $(FFLAGS) $<
+	  \mv MIEV0.o $(OBJDIR)
+$(OBJDIR)MieSupport.o: $(SOURCEDIR)MieSupport.f
+	  $(FC) -c $(FFLAGS) $<
+	  \mv MieSupport.o $(OBJDIR)
 $(OBJDIR)DMiLay.o: $(SOURCEDIR)DMiLay.f
 	  $(FC) -c $(FFLAGS) $<
 	  \mv DMiLay.o $(OBJDIR)
@@ -303,12 +313,12 @@ $(OBJDIR)Coagulation.o: $(COAGDIR)Coagulation.f90  \
 	$(EULERINC) $(INFINC) $(AEROINC) $(CONDINC) $(COAGINC) 
 	  $(FC) -c $(F90FLAGS) $<  
 	  \mv Coagulation.o $(OBJDIR) 
-$(OBJDIR)StepASP.o: $(SOURCEDIR)StepASP.f90 \
+$(OBJDIR)StepASP4SAM.o: $(SOURCEDIR)StepASP4SAM.f90 \
 	$(OBJDIR)GridPointFields.o   $(OBJDIR)Condensation.o \
        	$(OBJDIR)ModelParameters.o \
 	$(OBJDIR)Time.o $(OBJDIR)LagrangianAerosols.o $(ALLINC)
 	  $(FC) -c $(F90FLAGS) $<  
-	  \mv StepASP.o $(OBJDIR) 
+	  \mv StepASP4SAM.o $(OBJDIR) 
 $(OBJDIR)EulerianBoxDriver.o: $(SOURCEDIR)EulerianBoxDriver.f90 \
 	$(OBJDIR)GridPointFields.o   $(OBJDIR)Condensation.o \
        	$(OBJDIR)ModelParameters.o \

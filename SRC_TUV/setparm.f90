@@ -46,7 +46,8 @@ NAMELIST /PARAMETERS/ dodamping, doupperbound, docloud, doprecip, &
                 rad3Dout, nxco2, dosimfilesout, notracegases, &
                 doradlat, doradlon, ncycle_max, doseawater, &
                 dotracerperiodic, massemis, vg, plume_y, plume_x, &
-                fire_nstep_start, fire_i1, fire_i2, fire_k1, fire_k2
+                fire_nstep_start, fire_i1, fire_i2, fire_k1, fire_k2, &
+                asp_deck_dir, asp_output_dir
 	
 !----------------------------------
 !  Read namelist variables from the standard input:

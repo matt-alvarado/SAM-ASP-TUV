@@ -90,3 +90,8 @@
 50.0     !! Downwind dimensions in km
 50.0     !! Crosswind dimensions in km
 40.0     !! Fire CO emissions in kg/s (used to scale all other emissions)
+!! 3.d Lights on/off chamber experiment (required by common_ASP v2.2.2;
+!! not used by SAM-ASP-TUV)
+0        !! Lights on-off chamber experiment (1 = yes, 0 = no)
+0.0      !! Time to turn on the lights (only used if the flag above is 1)
+0.0      !! Time to turn off the lights (only used if the flag above is 1)

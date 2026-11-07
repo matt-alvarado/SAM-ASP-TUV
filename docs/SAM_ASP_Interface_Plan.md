@@ -270,3 +270,35 @@ species in `GasPhaseChems.in`: outputs must still be labelled correctly.
 - 3D gas output position 167 was meant to be PAN (per the code comment) but
   had become H13CO2CHO; the name list now writes PAN.
 
+
+**Phase 6 (common_ASP as a submodule) — done (decisions: 1a, 2a, 3a)**
+- `SRC_TUV/ASP/src` is now the common_ASP submodule, on branch
+  `claude/sam-asp-hardcoded-links-pstj1y` of common_ASP, which is
+  `asp_v2.2.2` plus the SAM-ASP-TUV changes. Repoint the submodule to
+  `asp_v2.2.2` once that branch is merged there.
+  After cloning SAM-ASP-TUV: `git submodule update --init`.
+- Moved into common_ASP: the SAM-ASP-TUV interface (`StepASP4SAM.f90`:
+  photolysis rates from TUV, 7-bin Fast-TUV aerosol optics, M3_TO_CM3 = 1e6),
+  `ShellRefIndAndRadFASTTUV`/`AerosolOptPropFASTTUV` (alongside the
+  full-spectrum routines), the `PhotoRates` export, and `SetMainDeckDirs`.
+- Not carried over (decisions 2a and 3a): SAM's edits to the electrolyte
+  equilibrium in Thermodynamics.h (asp_v2.2.2's rewritten solver is used),
+  and SAM's downgrade of the coagulation volume-loss check to a warning
+  (asp_v2.2.2 keeps it fatal and regrids out-of-order sections first).
+- SAM side: deck and output directories are namelist settings
+  (`asp_deck_dir`, `asp_output_dir`); `ASPInputDeck.in` has the three
+  lights on/off lines that asp_v2.2.2 requires; TUV's copies of
+  ErrMsg/WrtBad/WrtDim/TstBad/D1MACH in rtrans.f are renamed (ErrMsT, …,
+  D1MACT; same length, so fixed-form columns are unchanged) so they do not
+  clash with common_ASP's at link time.
+- The prebuilt ifort binaries still committed under SRC_TUV/ASP
+  (libAspLibrary.a, ObjectFiles/, ModuleFiles/) and the old copy under
+  SRC/ASP are from the previous bundled ASP and are now stale.
+
+**Question 3 (derived J-values 49–51) — answered**
+- Intended: 49 = 0.33·J(C2H5CHO) (butanal's first channel and 22 other
+  reactions in GasChemicalMechanism.in), 50 = 0.16·J(C2H5CHO) (butanal's
+  second channel), 51 = 100·J(MACR) (HPALD1, HPALD2); TUV has no rates for
+  these species.
+  They are currently set in both TUV4SAMASP.f and tracers.f90; phase 3
+  should keep these definitions and set them in one place.

@@ -19,6 +19,10 @@ source "$ENV_SCRIPT"
 
 if [ "$1" = clean ]; then rm -rf "$TOP/_build" "$TOP/OBJ"; fi
 
+# ASP source is the common_ASP submodule
+[ -f SRC_TUV/ASP/src/StepASP4SAM.f90 ] || {
+  echo "ASP source missing: run 'git submodule update --init' first"; exit 1; }
+
 mkdir -p _build/asp/ObjectFiles _build/asp/ModuleFiles _build/tuv
 echo "== ASP"
 (cd _build/asp && make -f "$TOP/SRC_TUV/ASP/Makefile" all \

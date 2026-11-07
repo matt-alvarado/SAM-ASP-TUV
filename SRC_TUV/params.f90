@@ -56,6 +56,10 @@ real:: massemis = 0. ! mass emission flux of biomass burning - CRL
 integer:: fire_nstep_start = 1080
 integer:: fire_i1 = 100, fire_i2 = 115
 integer:: fire_k1 = 32, fire_k2 = 55
+! ASP input-deck and output directories, relative to the run directory
+! (each ends in '/'); passed to InitializeASP.
+character(256):: asp_deck_dir = 'SRC_TUV/ASP/InorganicInputDecks/'
+character(256):: asp_output_dir = 'SRC_TUV/ASP/OutputFiles/'
 
 real(8):: tabs_s =0.	! surface temperature,K
 real:: delta_sst = 0.   ! amplitude of sin-pattern of sst about tabs_s (ocean_type=1)
