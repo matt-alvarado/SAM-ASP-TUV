@@ -50,6 +50,13 @@ FOBJS = numer.o functs.o orbit.o terint.o
 #        Cray users :  try FC = f90
  TUV_FC ?= ifort
  FC = $(TUV_FC)
+# Strict floating-point semantics, so TUV's (single-precision) results do
+# not depend on how the compiler reorders arithmetic.
+ifeq ($(TUV_FC),ifx)
+  TUV_FP ?= -fp-model=precise
+else
+  TUV_FP ?= -fp-model precise
+endif
 
 # FFLAGS : command line options to compiler call (if not set, default is
 #          probably some basic optimization level)
@@ -62,12 +69,12 @@ FOBJS = numer.o functs.o orbit.o terint.o
 #----------
 
 $(EXC):		$(FOBJS) $(USE_INCL) 
-		$(FC) $(FFLAGS) $(FOBJS) $(USE_INCL) $(LIBS) -o $@
+		$(FC) $(FFLAGS) $(TUV_FP) $(FOBJS) $(USE_INCL) $(LIBS) -o $@
 
 $(USE_INCL):	$(INCLUDES)
 
 .f.o:		
-		$(FC) $(FFLAGS) -I$(TUV_DIR) -c $<
+		$(FC) $(FFLAGS) $(TUV_FP) -I$(TUV_DIR) -c $<
 
 clean:		
 		rm -f core $(EXC) $(USE_INCL) $(FOBJS)
