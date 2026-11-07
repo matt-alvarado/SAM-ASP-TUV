@@ -545,11 +545,11 @@ c 333  format(3(0pf11.4))
       nz = 193
       do i = 1, 76 ! every 40 m for SAM-ASP
           z(i) = 0.04*(i-1)
-          write(*,*) i, z(i)
+c         write(*,*) i, z(i)
       enddo
       do i = 77, 193 !Every 1 km up to 120 km
          z(i) = z(76)+1.0*(i-76)
-         write(*,*) i, z(i)
+c        write(*,*) i, z(i)
       end do
 
       GOTO 10

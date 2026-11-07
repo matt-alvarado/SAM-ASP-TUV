@@ -80,10 +80,13 @@ with 616 gases (in the comments; the mechanism actually has 618), 86 aerosol spe
   `params kw=8` and `INPUTS/samasp nwint=-7`. The source says "SAM-ASP alt and wv grid
   and TUV alt and wv grid must match exactly", but nothing checks it.
 - `samAOD(200,8)` is sized by hand to TUV's `kz`/`kw`.
-- Vertical grid: `INPUTS/samasp` has `nz=197, zstop=120 km`, but SAM has `nzm=80`
-  stretched levels. SAM layer `kk` is copied into TUV layer `kk` without regridding.
-  `samAOD` uses `dz` and not the layer thickness `zi(k)-zi(k-1)`. The top layer index
-  `193` is hard-coded.
+- Vertical grid: TUV's `gridz` (grids.f) is hard-wired to a user grid of 193
+  levels, every 40 m to 3 km and then every 1 km to 120 km (the `nz=197` in
+  `INPUTS/samasp` is ignored), while SAM has `nzm=80` levels (20 m in tuvtest).
+  SAM layer `kk` is copied into TUV layer `kk` without regridding, so SAM's
+  aerosol and J-values are stretched about 2x in height and the top 5 SAM levels
+  are mapped to 3-8 km. `samAOD` uses `dz` and not the layer thickness. The top
+  layer index `193` is hard-coded.
 - TUV's site and date are hard-coded in `TUV4SAMASP.f` (`lat = 47.9392`,
   `lon = -118.6183`, 2019-08-03, `tmzone = 0`), overriding `INPUTS/samasp`
   (34.7 N, 120.2 E, 2009-11-17); neither is taken from SAM
@@ -325,3 +328,37 @@ species in `GasPhaseChems.in`: outputs must still be labelled correctly.
 - To add a photolysis reaction now: add its column to the mechanism and to
   `PhotoRates.in` (header and data), select the TUV reaction in
   `TUV/INPUTS/samasp`, and add a `PhotoMap.in` line — no code changes.
+
+**Phase 4 (TUV site, date and grids from SAM) — done**
+- `tuv4samasp` takes `latitude0`, `longitude0`, the calendar date (new namelist
+  setting `year0`; `day` = days since 1 January 00 UTC) and SAM's layer
+  interfaces. TUV's lowest levels are SAM's interfaces, then about 1 km apart to
+  120 km, so TUV layer k is SAM layer k; J-values are interpolated to SAM's layer
+  mid-heights; aerosol optical depth uses each layer's thickness; the top-layer
+  fix uses the real top layer. (Correction: before this, TUV used the 40 m / 1 km
+  grid hard-wired in `gridz`, not the equal-spaced grid of `INPUTS/samasp`, so
+  the old mapping stretched SAM's column about 2x, up to 8 km — not ~49 km as
+  stated in the phase 4 commit message.)
+- SAM's own solar zenith angle (passed to ASP) now uses longitude.
+- The tuv4samasp arrays are sized from TUV's params; ASP exports its optics
+  wavelengths (`NFastTUVWvl`, `FastTUVWavelengths`), and SAM checks TUV's bins
+  against them at the first TUV call.
+- Test: asptest at 20 UTC: TUV's solar zenith angle 53.96° (expected ~54° for
+  34.7 N, 18 November, local noon), 198 TUV levels, wavelength check passed,
+  no runtime errors.
+- Open question: in clear-sky columns J(O1D) rises ~55% and J(HONO) ~33% over
+  SAM's 1.6 km; the old grid showed a similar gradient, so it comes from TUV's
+  set-up, but it looks steep and should be checked against standalone TUV.
+
+**Phase 5 (remaining hard-coded settings) — done**
+- ASP's time step is SAM's substep `dtn` (was a literal 10 s).
+- CO threshold for calling ASP: namelist `asp_co_threshold_ppb` (default 130).
+- `create_run.py`: `rundir` defaults to the script's directory; writes `year0`.
+- Left as they are: TUV's data paths (`DATAE1/...`, `INPUTS/samasp`) are stock
+  TUV and resolve through the symlinks at the repository root; the rotor job
+  scripts (`run_tuvtest*.sh`, `sub_*.sh`) and the `*-fromrotor` / `.no_tuv` /
+  `.tuv` Makefile variants still contain rotor paths.
+- Open question: `tracers.f90` converts ASP's initial plume particle number to
+  particles per kg burned with `CO_init = 3400` ppb, while ASP's
+  `GasPhaseChems.in` sets the initial plume CO to 10000 ppb.
+
