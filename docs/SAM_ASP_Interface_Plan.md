@@ -84,8 +84,13 @@ with 616 gases (in the comments; the mechanism actually has 618), 86 aerosol spe
   stretched levels. SAM layer `kk` is copied into TUV layer `kk` without regridding.
   `samAOD` uses `dz` and not the layer thickness `zi(k)-zi(k-1)`. The top layer index
   `193` is hard-coded.
-- Lat/lon/date in `INPUTS/samasp` are fixed (34.7 N, 2009-11-17) and are not taken from
-  SAM `latitude0/longitude0/day`. `rdinp.f:132` hard-codes `inpfil='samasp'`.
+- TUV's site and date are hard-coded in `TUV4SAMASP.f` (`lat = 47.9392`,
+  `lon = -118.6183`, 2019-08-03, `tmzone = 0`), overriding `INPUTS/samasp`
+  (34.7 N, 120.2 E, 2009-11-17); neither is taken from SAM
+  `latitude0/longitude0/day`. Only the time comes from SAM. SAM's own solar
+  zenith angle (passed to ASP) ignores longitude. So TUV and SAM can disagree
+  about day and night: tuvtest (11 UTC) is night for TUV and all J-values
+  are zero. `rdinp.f:132` hard-codes `inpfil='samasp'`.
 
 ### 1.5 Deck and build paths
 
@@ -179,8 +184,8 @@ contains
 - Interpolate the SAM column onto the TUV altitude grid instead of copying index by
   index. Compute AOD from the real layer thickness `zi(k)-zi(k-1)`. Remove the
   hard-coded index `193`.
-- Pass `latitude0`, `longitude0`, the date and the time from SAM into `tuv4samasp`, so they
-  override the values in `INPUTS/samasp`. Make the TUV input file name an argument.
+- Pass `latitude0`, `longitude0`, the date and the time from SAM into `tuv4samasp`, replacing
+  the values hard-coded in `TUV4SAMASP.f`; use longitude in SAM's own solar zenith angle. Make the TUV input file name an argument.
 
 ### 2.5 Deck paths, build paths and code source
 
