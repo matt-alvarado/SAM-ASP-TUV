@@ -105,6 +105,7 @@
       INTEGER, INTENT(OUT) :: samnz, samnw
       REAL*8, INTENT(OUT) :: samwc(kw)
       INTEGER :: nupper
+      LOGICAL, PARAMETER :: lsamout = .FALSE.
       REAL :: ztopsam, dzup
 
 * Wavelength grid:
@@ -1073,7 +1074,10 @@ c 444  format(1pe11.4,1x,a50)
 
 * ____ SECTION 9: OUTPUT ______________________________________________
 
-      call outpt1( outfil, iout, 
+* SAM-ASP: TUV's own output file is not needed (the J-values are returned
+* to SAM) and outpt1 rewrote ../<outfil>.txt, outside the run directory,
+* on every call. Set lsamout = .TRUE. to write it again.
+      IF (lsamout) call outpt1( outfil, iout, 
      $     lirrad, laflux, lrates, ljvals, lmmech, lzenit,
      $     nms, ims, nmj, imj,
      $     nz, z, tlev, aircon, izout,

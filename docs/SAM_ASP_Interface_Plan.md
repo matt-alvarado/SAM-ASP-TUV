@@ -82,11 +82,12 @@ with 616 gases (in the comments; the mechanism actually has 618), 86 aerosol spe
 - `samAOD(200,8)` is sized by hand to TUV's `kz`/`kw`.
 - Vertical grid: TUV's `gridz` (grids.f) is hard-wired to a user grid of 193
   levels, every 40 m to 3 km and then every 1 km to 120 km (the `nz=197` in
-  `INPUTS/samasp` is ignored), while SAM has `nzm=80` levels (20 m in tuvtest).
-  SAM layer `kk` is copied into TUV layer `kk` without regridding, so SAM's
-  aerosol and J-values are stretched about 2x in height and the top 5 SAM levels
-  are mapped to 3-8 km. `samAOD` uses `dz` and not the layer thickness. The top
-  layer index `193` is hard-coded.
+  `INPUTS/samasp` is ignored). It was made to match tuvtest's SAM grid (80
+  layers of 40 m, 0–3.2 km), but only by hand: SAM layer `kk` is copied into TUV
+  layer `kk`, so SAM's top 5 layers (3.0–3.2 km) went into TUV's 1 km layers at
+  3–8 km, J-values were taken at each layer's bottom rather than its middle, and
+  any other SAM grid would be mapped wrongly. `samAOD` uses `dz` and not the
+  layer thickness. The top layer index `193` is hard-coded.
 - TUV's site and date are hard-coded in `TUV4SAMASP.f` (`lat = 47.9392`,
   `lon = -118.6183`, 2019-08-03, `tmzone = 0`), overriding `INPUTS/samasp`
   (34.7 N, 120.2 E, 2009-11-17); neither is taken from SAM
@@ -336,9 +337,10 @@ species in `GasPhaseChems.in`: outputs must still be labelled correctly.
   120 km, so TUV layer k is SAM layer k; J-values are interpolated to SAM's layer
   mid-heights; aerosol optical depth uses each layer's thickness; the top-layer
   fix uses the real top layer. (Correction: before this, TUV used the 40 m / 1 km
-  grid hard-wired in `gridz`, not the equal-spaced grid of `INPUTS/samasp`, so
-  the old mapping stretched SAM's column about 2x, up to 8 km — not ~49 km as
-  stated in the phase 4 commit message.)
+  grid hard-wired in `gridz`, which matched SAM's 40 m layers in tuvtest/asptest
+  up to 3 km; only the top 5 layers were mapped to 3–8 km. The phase 4 commit
+  message (~49 km) and an earlier version of this note (2x stretch, which
+  assumed 20 m layers) were wrong.)
 - SAM's own solar zenith angle (passed to ASP) now uses longitude.
 - The tuv4samasp arrays are sized from TUV's params; ASP exports its optics
   wavelengths (`NFastTUVWvl`, `FastTUVWavelengths`), and SAM checks TUV's bins
@@ -346,9 +348,14 @@ species in `GasPhaseChems.in`: outputs must still be labelled correctly.
 - Test: asptest at 20 UTC: TUV's solar zenith angle 53.96° (expected ~54° for
   34.7 N, 18 November, local noon), 198 TUV levels, wavelength check passed,
   no runtime errors.
-- Open question: in clear-sky columns J(O1D) rises ~55% and J(HONO) ~33% over
-  SAM's 1.6 km; the old grid showed a similar gradient, so it comes from TUV's
-  set-up, but it looks steep and should be checked against standalone TUV.
+- Check against standalone TUV (TUV.f main program, the same TUV library,
+  default atmosphere from `INPUTS/samasp`, asptest's site and time): in
+  clear-sky columns the coupled J(O1D) and J(HONO) are within 1.2% of
+  standalone TUV without aerosol at every SAM level from 20 m to 3.2 km
+  (the coupled column has no aerosol in SAM's layers); both rise ~58%
+  (O1D) and ~33% (HONO) from the surface to 3.2 km. Standalone TUV gives the
+  same values on SAM's grid as on its own, and repeated `tuv4samasp` calls
+  give identical results.
 
 **Phase 5 (remaining hard-coded settings) — done**
 - ASP's time step is SAM's substep `dtn` (was a literal 10 s).

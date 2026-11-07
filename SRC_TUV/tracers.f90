@@ -201,7 +201,7 @@ END FUNCTION
                 REAL*8, allocatable :: SaltConcEnv(:)
 		REAL*8 :: filler_value
 	 	integer :: doAerosols
-                real*8,parameter :: CO_init = 3400.0 ! ppb
+                real*8 :: CO_init ! initial plume CO (ppb), from ASP's GasPhaseChems.in
       ! ---------------------- end from ASP
 
  tracer = 0.
@@ -227,6 +227,10 @@ END FUNCTION
   write(*,*) 'After InitializeASP.... '
   ! Tracer layout from ASP's species counts; stops if ntracers does not match
   call samasp_layout_init(ntracers, masterproc)
+  ! CO in ASP's initial plume (the CO that goes with the particle numbers in
+  ! AerosolModes.in), used to convert those to particles per kg burned
+  CO_init = GasPhaseCOInit
+  if (masterproc) write(*,*) 'Initial plume CO from GasPhaseChems.in (ppb): ', CO_init
   ! TUV -> ASP photolysis mapping (PhotoMap.in); stops if it is inconsistent
   call samasp_photo_init(trim(asp_deck_dir), masterproc)
   allocate(PhotoArr(dimx1_s:dimx2_s, dimy1_s:dimy2_s, nzm, nPhoto), jasp(nzm, nPhoto))
@@ -1254,8 +1258,9 @@ enddo ! nx
          write(*,*) "Before tuv4samasp", samtstart
          ! TUV at SAM's site, date (year0, day) and UTC time, on a height grid
          ! whose lowest levels are SAM's layer interfaces
-         ! day is days since 1 January 00 UTC of year0 (as written by create_run.py)
-         call day_to_date(year0, int(day)+1, tuv_month, tuv_dom)
+         ! day is the calendar day of year0 as in SAM's CAM radiation
+         ! (1.0 = 1 January 00 UTC)
+         call day_to_date(year0, int(day), tuv_month, tuv_dom)
          call tuv4samasp(samtstart, dble(latitude0), dble(longitude0), &
                          year0, tuv_month, tuv_dom, &
                          nzm, samzi, samAOD, samSSA, samASYM, samvalj, &

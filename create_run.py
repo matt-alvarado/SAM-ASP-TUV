@@ -438,7 +438,9 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
    ofyear = emisdate - datetime(emisdate.year,01,01)
    case_year = emisdate.year # calendar year of day0 (year0 in prm)
    for i in range(npts):
-      day[i] = ofyear.days + float(ofyear.seconds)/(3600.*24.) + i
+      # calendar day as in SAM's CAM radiation (1.0 = 1 January 00 UTC),
+      # the same convention as mflx_1stday below
+      day[i] = ofyear.days + 1 + float(ofyear.seconds)/(3600.*24.) + i
 
 
    # the 3D data from the output files comes out as data[time,level,y,x]

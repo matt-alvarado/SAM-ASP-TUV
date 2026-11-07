@@ -2,8 +2,8 @@
 ! Fire emissions start at step 0 (fire_nstep_start) and last
 ! 2*(plume_y-dy)/vg/dt = 10 steps; ASP is called from step 11 where
 ! CO > 130 ppb. day0 is 20 UTC, about local noon at the site
-! (latitude0, longitude0; year0 = 2009; day0 counts days since 1 January,
-! so 321.8333 is 18 November 20 UTC), which SAM
+! (latitude0, longitude0; year0 = 2009; day0 is the calendar day as in
+! SAM's CAM radiation, so 321.8333 is 17 November 20 UTC), which SAM
 ! and TUV both use, so photolysis is active.
 ! 3D output every 10 steps; run stops at step 30.
  &MICRO_M2005 
