@@ -381,3 +381,13 @@ species in `GasPhaseChems.in`: outputs must still be labelled correctly.
   reproduces the committed `PHOTO.DAT` line for line, with the reactions in
   PhotoRates.in order (Python 2 used arbitrary dict order). `create_run.py`
   compiles but was not run (it downloads NCEP data).
+
+**Initial plume CO from the deck and CAM day convention — done**
+- `tracers_init` uses ASP's initial plume CO from `GasPhaseChems.in`
+  (`GasPhaseCOInit`, 10000 ppb) instead of the hard-coded 3400 ppb when
+  converting ASP's initial plume particle numbers to particles per kg burned.
+  Test (asptest, before ASP's first call): emitted POA and particle numbers
+  scale by 0.340 (= 3400/10000); gases and dynamics are bit-identical.
+- `day0`/`day` follow SAM's CAM radiation (1.0 = 1 January 00 UTC);
+  `create_run.py` writes them that way. asptest is 17 November 20 UTC again
+  (TUV solar zenith angle 53.96°).
