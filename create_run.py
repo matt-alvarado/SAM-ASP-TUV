@@ -29,7 +29,8 @@ import netCDF4
 # --YOU WILL LIKELY ONLY NEED TO EDIT THIS SECTION---# 
 # Set your input conditions in the params.txt file in the rundir that you
 # set below!
-rundir = '/nas/data_cellar/rotor/data/p2033/SAM-ASP_tuv' #<==EDIT THIS
+# Default: the directory holding this script (the SAM-ASP-TUV checkout)
+rundir = os.path.dirname(os.path.abspath(__file__)) #<==EDIT THIS if needed
 caseidfill = "ADTEST" #<==EDIT THIS
 #---- END EDIT SECTION ---#
 
@@ -435,6 +436,7 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
       emisdate = datetime(1,1,1,0) + timedelta(hours=time[t])
    day = np.zeros(npts)
    ofyear = emisdate - datetime(emisdate.year,01,01)
+   case_year = emisdate.year # calendar year of day0 (year0 in prm)
    for i in range(npts):
       day[i] = ofyear.days + float(ofyear.seconds)/(3600.*24.) + i
 
@@ -873,7 +875,9 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
       prmfile.write(' dy = '+dxy+',\n')
       prmfile.write(' dt = '+str(dt)+',\n\n')
 
-      prmfile.write(' day0= '+str(day[0])+',\n\n')
+      prmfile.write(' day0= '+str(day[0])+',\n')
+      # calendar year of day0 (TUV's date)
+      prmfile.write(' year0 = '+str(case_year)+',\n\n')
 
       prmfile.write(' nstop = '+str(nstop)+',\n')
       prmfile.write(' nrestart_skip = '+str(nstop)+',\n\n')

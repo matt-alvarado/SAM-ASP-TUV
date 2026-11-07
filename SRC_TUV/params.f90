@@ -59,9 +59,12 @@ integer:: fire_k1 = 32, fire_k2 = 55
 ! ASP input-deck and output directories, relative to the run directory
 ! (each ends in '/'); passed to InitializeASP.
 character(256):: asp_deck_dir = 'SRC_TUV/ASP/InorganicInputDecks/'
-! Calendar year of the run (day0, day are days of that year); used for
-! TUV's date (Earth-Sun distance and solar declination)
+! Calendar year of the run; day0 and day are days since 1 January 00 UTC
+! of that year. Used for TUV's date (Earth-Sun distance, solar declination)
 integer:: year0 = 2009
+! ASP (chemistry, aerosol) is run only where CO exceeds this (ppb), i.e. in
+! the plume, after the fire emissions have stopped
+real:: asp_co_threshold_ppb = 130.
 character(256):: asp_output_dir = 'SRC_TUV/ASP/OutputFiles/'
 
 real(8):: tabs_s =0.	! surface temperature,K

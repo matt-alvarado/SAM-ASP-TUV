@@ -633,7 +633,7 @@ enddo ! nx
       iup=(100+xextent)/2
       AfterGasConc = 0.0D0
       Transmissivity = 1.0
-      tstep = 10 
+      tstep = dble(dtn) ! ASP time step = SAM's (sub)step; tracers_physics is called every substep
 
       !doAerosols = 1
 
@@ -784,7 +784,7 @@ enddo ! nx
 	
             !IF (GasConc(2).gt.130.and.nstep.gt.200) THEN
 !            write(*,*) 'CO Conc gt 130 chk',GasConc(2)
-            IF (GasConc(iCOg).gt.130.and.nstep.gt.cur_dist) THEN	!AD DEBUG
+            IF (GasConc(iCOg).gt.asp_co_threshold_ppb.and.nstep.gt.cur_dist) THEN	!AD DEBUG
 		!write(*,*) 'Fire Loop CO Conc gt 130 chk',GasConc(2)
 !	     IF (.FALSE.) THEN 	 !AD DEBUG SKIP LOOP ENTIRELY
             	! Aerosol MassConc
@@ -1254,7 +1254,8 @@ enddo ! nx
          write(*,*) "Before tuv4samasp", samtstart
          ! TUV at SAM's site, date (year0, day) and UTC time, on a height grid
          ! whose lowest levels are SAM's layer interfaces
-         call day_to_date(year0, int(day), tuv_month, tuv_dom)
+         ! day is days since 1 January 00 UTC of year0 (as written by create_run.py)
+         call day_to_date(year0, int(day)+1, tuv_month, tuv_dom)
          call tuv4samasp(samtstart, dble(latitude0), dble(longitude0), &
                          year0, tuv_month, tuv_dom, &
                          nzm, samzi, samAOD, samSSA, samASYM, samvalj, &
