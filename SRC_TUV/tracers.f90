@@ -20,6 +20,7 @@ module tracers
  use Coagulation
  use GridPointFields
  use InfrastructuralCode
+ use samasp_layout
  implicit none
 
  real tracer  (dimx1_s:dimx2_s, dimy1_s:dimy2_s, nzm, 0:ntracers)
@@ -60,13 +61,10 @@ REAL*8 :: samtstart, samAOD(200,8), samSSA(200,8), samASYM(200,8), samvalj(150,2
       INTEGER, PARAMETER :: SRTSO4 = 1
       INTEGER, PARAMETER :: SRTNH4 = 2
       INTEGER, PARAMETER :: SRTH2O = 3
-      INTEGER, PARAMETER :: ngas = 617 ! # of gas species before aerosol in 
-                                     ! tracer array
 
 
       !INTEGER, PARAMETER :: HowManyEvolveGasChems = 617
 
-      INTEGER, PARAMETER :: HowManyBins = 10
 
       ! Tracer classification
       integer, parameter :: tbulk = 1 ! bulk tracers
@@ -81,7 +79,6 @@ REAL*8 :: samtstart, samAOD(200,8), samSSA(200,8), samASYM(200,8), samvalj(150,2
                              ! initialized in tracers_init
       real fluxsave(-1:nxp3,-1:nyp3,nz,2,3,ibins) ! used for advection
       real fnumsave(-2:nxp3,-2:nyp3,nz,2,ibins) ! used for advection
-      real tracervar (nx,ny,nzm,ngas) ! variance saved for 3D diagnostics
 
 	! Emissions - CRL
 
@@ -119,12 +116,18 @@ FUNCTION Find_Chem(Chem) RESULT (Index)
   INTEGER				  :: i, Index, Phase
   CHARACTER*(*)		  :: Chem
 
+  ! Index of the tracer named Chem; stops the run if there is none.
+  Index = 0
   DO i = 1, ntracers
      IF (Trim(Chem) .eq. Trim(tracername(i))) THEN
         Index = i
         EXIT
      END IF
   ENDDO
+  IF (Index .eq. 0) THEN
+     write(*,*) 'ERROR (Find_Chem): no tracer named ', Trim(Chem)
+     call task_abort()
+  END IF
 
   RETURN
 
@@ -133,7 +136,6 @@ END FUNCTION
  subroutine tracers_init()
   use vars, only: P, tabs
   use params
-  use ModelParameters,	ONLY : HowManyBins
   use InfrastructuralCode	
   use GridPointFields
   use Chemistry
@@ -169,26 +171,24 @@ END FUNCTION
 		REAL*8 :: Temp  !(in K)
 		REAL*8 :: Press !(in mbar)
 		REAL*8 :: Dens  !(in kg/m3 dry air)
-		REAL*8 :: GasConc(616) ! (in ppb)
-		REAL*8 :: AeroNumConc(10) !(in # particles/cm3)
-		REAL*8 :: AeroMassConc(10, 86) !(in ug/m3)
-		REAL*8 :: AeroNumConcCheck(10) !(in # particles/cm3)
-		REAL*8 :: AeroMassConcCheck(10, 86) !(in ug/m3)
-		REAL*8 :: Radius(10)
-		REAL*8 :: TermVel(10)
-		REAL*8 :: EnvNumConc(10) !(in # particles/cm3)
-		REAL*8 :: EnvMass(10, 86) !(in ug/m3)
+		! Sized from samasp_layout after InitializeASP
+		REAL*8, allocatable :: GasConc(:) ! (in ppb)
+		REAL*8, allocatable :: AeroNumConc(:) !(in # particles/cm3)
+		REAL*8, allocatable :: AeroMassConc(:,:) !(in ug/m3)
+		REAL*8, allocatable :: AeroNumConcCheck(:) !(in # particles/cm3)
+		REAL*8, allocatable :: AeroMassConcCheck(:,:) !(in ug/m3)
+		REAL*8, allocatable :: Radius(:)
+		REAL*8, allocatable :: TermVel(:)
+		REAL*8, allocatable :: EnvNumConc(:) !(in # particles/cm3)
+		REAL*8, allocatable :: EnvMass(:,:) !(in ug/m3)
                 ! CB: Ifort complains unless these dimensions match
 		!REAL*8, DIMENSION(18) :: ExtCoeff, SingScat, Assym
                 REAL*8, DIMENSION(7):: ExtCoeff, SingScat, Assym
                 REAL*8, allocatable :: SaltConc(:)
                 REAL*8, allocatable :: SaltConcEnv(:)
 		REAL*8 :: filler_value
-		REAL*8 :: NumConcWeight(10)
-		REAL*8 :: MassConcWeight(10)
 	 	integer :: doAerosols
                 real*8,parameter :: CO_init = 3400.0 ! ppb
-                integer, parameter :: CO_index = 2
       ! ---------------------- end from ASP
 
  tracer = 0.
@@ -211,6 +211,11 @@ END FUNCTION
   call PopulateParticlesSectionsRightAway(.TRUE.)
   call SortBoundaryPart
   write(*,*) 'After InitializeASP.... '
+  ! Tracer layout from ASP's species counts; stops if ntracers does not match
+  call samasp_layout_init(ntracers, masterproc)
+  allocate(GasConc(nGas), AeroNumConc(nBins), AeroMassConc(nBins,nSpec), &
+           AeroNumConcCheck(nBins), AeroMassConcCheck(nBins,nSpec), &
+           Radius(nBins), TermVel(nBins), EnvNumConc(nBins), EnvMass(nBins,nSpec))
 ! Initialize values
   Temp = GetTemp()
   Press = GetPress()
@@ -305,7 +310,7 @@ endif! do aerosols
 
    ! Default names are TRACER01, TRACER02, etc:
 
-   do ntr = 1, HowManyEvolveGasChems! - 616 evolving Gas species CRL
+   do ntr = 1, HowManyEvolveGasChems ! evolving gas species (nGas)
    	tracername(ntr) = GasPhaseChemicalNames(ntr)
    	tracerunits(ntr) = '[ppb]'
    enddo
@@ -413,76 +418,15 @@ NumAq = HowManyAqChems+HowManyAqCations+HowManyAqAnions
 	!write(*,*)	HSO4i , AqPhaseChemicalNames(HSO4i), AqMolecularMass(HSO4i)
 
 if(doAerosols.gt.0) then
-! Aqueous Phase Chems
-ntrtrack = HowManyEvolveGasChems+1
-do binnum=1,HowManyBins
-   do ntr = 1, NumAq! - 41 total AqPhaseChemicals  CRL
-
-		if (binnum.lt.10) then
-			!write(tmp_name,'(i1)') binnum
-			aero_name = trim(AqPhaseChemicalNames(ntr))//'0'//trim(tmp_name)
-		else
-			!write(tmp_name,'(i2)') binnum
-			aero_name = trim(AqPhaseChemicalNames(ntr))//trim(tmp_name)
-		endif
-
-   		tracername(ntrtrack) = aero_name
-   		tracerunits(ntrtrack) = '[kg/kg_air]'
-		ntrtrack = ntrtrack+1
+! Aerosol tracer names come from samasp_layout: species name + 2-digit bin,
+! e.g. K+01, POA105, AqPOA110, and NoCo01..NoCoNN for number concentrations.
+do binnum=1,nBins
+   do ntr = 1, nSpec
+      tracername(itr_mass(binnum,ntr)) = aero_species_name(binnum,ntr)
+      tracerunits(itr_mass(binnum,ntr)) = '[kg/kg_air]'
    enddo
-
-
-!write(*,*)'!!!!!!!!!!!! '
-!write(*,*)'Organic Phase Chems Names '
-! Organic Phase Chems
-   do ntr = 1,HowManyOrgChems	
-		if (binnum.lt.10) then
-			write(tmp_name,'(i1)') binnum
-			aero_name = trim(OrgPhaseChemicalNames(ntr))//'0'//trim(tmp_name)
-		else
-			write(tmp_name,'(i2)') binnum
-			aero_name = trim(OrgPhaseChemicalNames(ntr))//trim(tmp_name)
-		endif
-
-   		tracername(ntrtrack) = aero_name
-   		tracerunits(ntrtrack) = '[kg/kg_air]'
-		ntrtrack = ntrtrack+1
-
-   enddo
-
-! Aqueous Organic Phase Chems
-
-   do ntr = 1,HowManyAqOrgChems	
-
-		if (binnum.lt.10) then
-			write(tmp_name,'(i1)') binnum
-			aero_name = trim('Aq'//AqOrgPhaseChemicalNames(ntr))//'0'//trim(tmp_name)
-		else
-			write(tmp_name,'(i2)') binnum
-			aero_name = trim('Aq'//AqOrgPhaseChemicalNames(ntr))//trim(tmp_name)
-		endif
-
-   		tracername(ntrtrack) = aero_name
-   		tracerunits(ntrtrack) = '[kg/kg_air]'
-		ntrtrack = ntrtrack+1
-
-   enddo
-
-! NumConc
-
-
-
-		if (binnum.lt.10) then
-			write(tmp_name,'(i1)') binnum
-			aero_name = 'NoCo'//'0'//trim(tmp_name)
-		else
-			write(tmp_name,'(i2)') binnum
-			aero_name = 'NoCo'//trim(tmp_name)
-		endif
-
-   		tracername(1478+binnum) = aero_name
-   		tracerunits(1478+binnum) = '[#/kg_air]'
-
+   tracername(itr_num(binnum)) = num_conc_name(binnum)
+   tracerunits(itr_num(binnum)) = '[#/kg_air]'
 enddo ! binnum
 
 endif ! do aerosols
@@ -522,7 +466,7 @@ do i=1,nx
             enddo
 
             ! Initializing Aerosols
-            CO_conc = (CO_init*1e-9 * GasMolecularMass(CO_index) / Av )*airdenstm ! ppbCO to g/cm3
+            CO_conc = (CO_init*1e-9 * GasMolecularMass(iCOg) / Av )*airdenstm ! ppbCO to g/cm3
 
             cur => particles%first
             env => boundaryparticles%first
@@ -535,7 +479,7 @@ do i=1,nx
                SaltConc = HypotheticalElectrolyteConcentrations (cur)
                !SaltConcEnv =  HypotheticalElectrolyteConcentrations (env)
 
-               part_conc = GasPhaseEmisFactor(CO_index)*cur%numberofparticles/CO_conc ! #/kg_burned
+               part_conc = GasPhaseEmisFactor(iCOg)*cur%numberofparticles/CO_conc ! #/kg_burned
 
                ! water
                tracer(i,j,l,ntrtrack) = (env%AqChems(1))*(env%numberofparticles*AqMolecularMass(1))/(Mgas/Av*airmw)	! convert mol/cm3 to kg/kg_air
@@ -582,8 +526,8 @@ do i=1,nx
 
                ! NumConc
                !write(*,*) 'NumConc'
-               tracer(i,j,l,1476+B) = env%numberofparticles/(Mgas/Av*airmw*1e-3) ! convert #/cm3 to #/kg_air
-               tracerfire(i,j,l,1476+B) = part_conc*massemis*boxarea*dt/boxmass ! convert #/kg_burned to #/kg_air
+               tracer(i,j,l,itr_num(B)) = env%numberofparticles/(Mgas/Av*airmw*1e-3) ! convert #/cm3 to #/kg_air
+               tracerfire(i,j,l,itr_num(B)) = part_conc*massemis*boxarea*dt/boxmass ! convert #/kg_burned to #/kg_air
 
                B = B + 1
 		
@@ -644,13 +588,13 @@ enddo ! nx
       REAL*8 :: GasConc(HowManyEvolveGasChems)  
       REAL*8 :: AfterGasConc(HowManyEvolveGasChems)  
       REAL*8 :: TempGasConc(HowManyEvolveGasChems)   
-      REAL*8 :: NumConc(10)   
-      REAL*8 :: MassConc(10,HowManyAqChems+HowManyAqCations+HowManyAqAnions+HowManyOrgChems+HowManyAqOrgChems)   
-      REAL*8 :: AfterNum(10)   
-      REAL*8 :: AfterMass(10,HowManyAqChems+HowManyAqCations+HowManyAqAnions+HowManyOrgChems+HowManyAqOrgChems)
+      REAL*8 :: NumConc(nBins)   
+      REAL*8 :: MassConc(nBins,nSpec)   
+      REAL*8 :: AfterNum(nBins)   
+      REAL*8 :: AfterMass(nBins,nSpec)
 
       !REAL*8 :: TermVel(HowManyEvolveGasChems)  !!MM DEBUG
-      REAL*8 :: TermVel(10) 
+      REAL*8 :: TermVel(nBins) 
       REAL*8 :: t_TotOA   
       REAL*8 :: PhotolysisRates(51)   
       ! ---------------------- end from ASP
@@ -719,10 +663,10 @@ enddo ! nx
    
 		     enddo 
 
-                     do binnum=1,HowManyBins
+                     do binnum=1,nBins
                         ! Aerosol MassConc
                         ! Aqueous Phase Chems + Organic Phase Chems + Aq Organic Phase Chems
-                      do ntr = 1, HowManyAqChems+HowManyAqCations+HowManyAqAnions+HowManyOrgChems+HowManyAqOrgChems!
+                      do ntr = 1, nSpec!
 
 	   		   tracer(iden,emisgridy,zden,ntrtrack) = tracer(iden,emisgridy,zden,ntrtrack) + tracerfire(iden,emisgridy,zden,ntrtrack)! in kg/kg_air
                        !if (iden.eq.12.and.zden.eq.30) then
@@ -732,9 +676,9 @@ enddo ! nx
                       enddo
 
                        ! NumConc
-                      tracer(iden,emisgridy,zden,1476+binnum) = tracer(iden,emisgridy,zden,1476+binnum)+ tracerfire(iden,emisgridy,zden,1476+binnum)! in #/kg_air
+                      tracer(iden,emisgridy,zden,itr_num(binnum)) = tracer(iden,emisgridy,zden,itr_num(binnum))+ tracerfire(iden,emisgridy,zden,itr_num(binnum))! in #/kg_air
                       !if (i.eq.12.and.l.eq.30) then
-                        !write(*,*) tracername(1476+binnum), binnum,tracer(iden,emisgridy,zden,1476+binnum)*(airdenstm/Av*airmw)*1e-3
+                        !write(*,*) tracername(itr_num(binnum)), binnum,tracer(iden,emisgridy,zden,itr_num(binnum))*(airdenstm/Av*airmw)*1e-3
                         !write(*,*)''
                       !endif
                      enddo ! binnum
@@ -793,7 +737,7 @@ enddo ! nx
                 ntrtrack2 = ntrtrack +1
             enddo
 
-            GasConc(1) = waterconc
+            GasConc(iH2Og) = waterconc
 !write(*,*) "Before Fire Loop tracers.f90 sum(tracer) L786", sum(tracer) !AD DEBUG
             !write(*,*), "L779 tracers_physics waterconc", waterconc
             !!!! Identifed as a fire grid box so running ASP 
@@ -816,25 +760,25 @@ enddo ! nx
 	
             !IF (GasConc(2).gt.130.and.nstep.gt.200) THEN
 !            write(*,*) 'CO Conc gt 130 chk',GasConc(2)
-            IF (GasConc(2).gt.130.and.nstep.gt.cur_dist) THEN	!AD DEBUG
+            IF (GasConc(iCOg).gt.130.and.nstep.gt.cur_dist) THEN	!AD DEBUG
 		!write(*,*) 'Fire Loop CO Conc gt 130 chk',GasConc(2)
 !	     IF (.FALSE.) THEN 	 !AD DEBUG SKIP LOOP ENTIRELY
             	! Aerosol MassConc
             	! Aqueous Phase Chems + Org Phase + Aq Org Phase
 
 		!if (doAerosols.gt.0) then
-               do binnum=1,HowManyBins
-                  do ntr = 1, HowManyAqChems+HowManyAqCations+HowManyAqAnions+HowManyOrgChems+HowManyAqOrgChems
+               do binnum=1,nBins
+                  do ntr = 1, nSpec
 
 			MassConc(binnum,ntr)=tracer(i,j,l,ntrtrack)*(airdenstm/Av*airmw)*1e12
 			ntrtrack = ntrtrack+1
                   enddo
-            	  NumConc(binnum) = tracer(i,j,l,1476+binnum)*(airdenstm/Av*airmw*1e-3)
+            	  NumConc(binnum) = tracer(i,j,l,itr_num(binnum))*(airdenstm/Av*airmw*1e-3)
 
                enddo
 	       !write(*,*) "Fire Loop L824 sum(tracer(i,j,l,:))", sum(tracer(i,j,l,:)) !AD DEBUG
                !write(*,*) 'Fire Loop sum(tracer) L824', sum(tracer) !AD DEBUG
-               do binnum=1,HowManyBins
+               do binnum=1,nBins
                   if (sum(MassConc(binnum,:)).lt.1e-30) then
                      NumConc(binnum) = 0.0
                   end if
@@ -854,7 +798,6 @@ enddo ! nx
                   !write(*,*) 'Mgas = ',Mgas
                   !write(*,*) ' SAMASP air dens = ',airdenstm
 
-                  ntrtrack2 = 673
 
 
                   !do ntr=1,HowManyEvolveGasChems
@@ -958,7 +901,7 @@ enddo ! nx
                   !enddo
 
                   !do ntr = 1, HowManyAqChems+HowManyAqCations+HowManyAqAnions+HowManyOrgChems+HowManyAqOrgChems                  
-                  do ntr = 56,64
+                  do ntr = nAq+1, nAq+nOrg ! all organic-phase species
 
                         !write(*,*) tracername(ntrtrack2-1), sum(MassConc(:,ntr)),MassConc(:,ntr)
 			ntrtrack2 = ntrtrack2+1
@@ -1102,14 +1045,14 @@ enddo ! nx
 
 !write(*,*) "Fire Loop tracers.f90 sum(tracer) L1023", sum(tracer) !AD DEBUG
             	! Aqueous Phase Chems + Org Phase + Aq Org Phase
-            	do binnum=1,HowManyBins
-                   do ntr = 1, HowManyAqChems+HowManyAqCations+HowManyAqAnions+HowManyOrgChems+HowManyAqOrgChems
+            	do binnum=1,nBins
+                   do ntr = 1, nSpec
 			tracer(i,j,l,ntrtrack)= MassConc(binnum,ntr)/(airdenstm/Av*airmw)/1e12
 			ntrtrack = ntrtrack+1
             	   enddo
 
             	   ! NumConc
-		   tracer(i,j,l,1476+binnum)= NumConc(binnum)/(airdenstm/Av*airmw*1e-3)
+		   tracer(i,j,l,itr_num(binnum))= NumConc(binnum)/(airdenstm/Av*airmw*1e-3)
 
                 enddo ! binnum
                !write(*,*) "Fire Loop tracers.f90 sum(tracer) L1035", sum(tracer) !AD DEBUG
@@ -1126,7 +1069,6 @@ enddo ! nx
                   !write(*,*) 'sza = ',solar_zenith_angle
                   !write(*,*) 'GasPhaseChemicalRates(NO3 -> NO #7) = ',GasPhaseChemicalRates(7)
                   !write(*,*) 'GasPhaseChemicalRates(NO3 -> NO2 #8) = ',GasPhaseChemicalRates(8)
-                  ntrtrack2 = 673
                   !do ntr=1,HowManyEvolveGasChems
                      !write(*,*) GasPhaseChemicalNames(ntr),   GasConc(ntr)  , ntr  
                      !if (ntr .EQ. findchem('CO', 0)) then
@@ -1229,7 +1171,7 @@ enddo ! nx
                   !enddo
 
                   !do ntr = 1, HowManyAqChems+HowManyAqCations+HowManyAqAnions+HowManyOrgChems+HowManyAqOrgChems
-                  do ntr = 56, 64
+                  do ntr = nAq+1, nAq+nOrg ! all organic-phase species
                        !write(*,*) tracername(ntrtrack2-1), sum(MassConc(:,ntr)),MassConc(:,ntr)
                        t_TotOA = t_TotOA + sum(MassConc(:,ntr))
                        ntrtrack2 = ntrtrack2+1

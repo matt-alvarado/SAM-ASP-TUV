@@ -5,7 +5,9 @@ Goal: a change to ASP's chemical mechanism, species lists, bin count or photolys
 code. SAM should take every count, offset and index from ASP at run time, and it
 should stop with a clear message when something cannot be matched.
 
-Status: plan only. No code has been changed. Nothing here has been built or run.
+Status (see §5 for details): phases 0, 1 (partly) and 2 are done on branch
+`claude/sam-asp-hardcoded-links-pstj1y`; the code builds with Intel ifx
+(`build_ifx.sh`) and the short `RUNS/asptest` case runs (`run_asptest_ifx.sh`).
 
 ---
 
@@ -14,11 +16,11 @@ Status: plan only. No code has been changed. Nothing here has been built or run.
 ### 1.1 Tracer array layout (`SRC_TUV/tracers.f90`, `SRC_TUV/domain.f90`)
 
 The tracer vector is `[gases | bin1 species | … | bin10 species | NumConc bin1..10]`,
-with 616 gases, 86 aerosol species per bin and 10 bins. These numbers appear as literals:
+with 616 gases (in the comments; the mechanism actually has 618), 86 aerosol species per bin and 10 bins. These numbers appear as literals:
 
 | Where | Literal | Should come from |
 |---|---|---|
-| `domain.f90:24` | `ntracers = 1489` | `nGas + nBins*(nSpec+1)` (= 1486 today) |
+| `domain.f90:24` | `ntracers = 1489` | `nGas + nBins*(nSpec+1)` (= 1488 today) |
 | `tracers.f90:63` | `ngas = 617` | `HowManyEvolveGasChems` |
 | `tracers.f90:69` | module `HowManyBins = 10` (hides ASP's run-time `HowManyBins`) | `ModelParameters::HowManyBins` |
 | `tracers.f90` `tracers_init` | `GasConc(616)`, `AeroMassConc(10,86)`, `EnvMass(10,86)`, `NumConcWeight(10)` … | ASP counts |
@@ -231,3 +233,40 @@ species in `GasPhaseChems.in`: outputs must still be labelled correctly.
    `zden 32..55`, `nstep>1080`, the `GasConc(2)>130` trigger, `tstep=10`): these are
    case set-up, not the ASP link. Should they move to the namelist as part of this
    work, or be handled separately?
+
+---
+
+## 5. Progress
+
+**Build and test set-up**
+- Makefiles take paths and compilers from the environment (defaults = rotor
+  ifort build); `build_ifx.sh` builds with Intel ifx + Open MPI + NetCDF.
+- `RUNS/asptest` (fire from step 0, 30 steps) exercises SAM, TUV and ASP in
+  about 12 minutes; repeated runs give bit-identical output.
+
+**Phase 1 (bug fixes) — done so far**
+- TUV4SAMASP.f: `sammap` −1 entries no longer written (out of bounds); J-value
+  loop bound `nj` → `nmj`; "fix top layer" applied for every wavelength
+  instead of `iw = kw+1`. savout.f: `outfil` length mismatch.
+- Fire emissions: rank 7 wrote `tracer(100..115,…)` out of bounds; the box is
+  now in global x indices and set in the namelist (`fire_*`).
+- `ParticleAttributes.h` restored (was a truncated symlink).
+- Still open: the 49–51 derived J-values after the TUV loop (question 3).
+
+**Phase 2 (tracer layout) — done**
+- New `SRC_TUV/samasp_layout.f90`: counts, offsets, tracer names and the
+  H2O/CO gas indices come from ASP after `InitializeASP`. SAM stops at start-up
+  with the required `ntracers` if `domain.f90` does not match (tested by
+  changing the bin count in `AerosolModes.in`).
+- `tracers.f90` and `write_fields3D.f90` use the layout everywhere (no 616,
+  617, 86, 10-bin, 1476/1478/1479 literals left); 3D gas outputs are chosen by
+  name (`gas3d_names`); `Find_Chem` stops on a missing name.
+- Bugs this fixed: the mechanism has 618 gases, but number concentrations were
+  stored at 1476+bin, overlapping the last two aqueous-organic species of
+  bin 10; number-concentration names and 3D outputs were offset by 2; aqueous
+  tracer names carried the wrong bin number, so the 3D aqueous totals (TotK,
+  TotNa, …) used the wrong bins; `GasConc(616)` was passed where 618 were
+  expected.
+- 3D gas output position 167 was meant to be PAN (per the code comment) but
+  had become H13CO2CHO; the name list now writes PAN.
+

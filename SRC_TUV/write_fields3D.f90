@@ -22,7 +22,24 @@ implicit none
  character *10 units
  character *12 c_z(nzm),c_p(nzm),c_dx, c_dy, c_time
 integer i,j,l,k,n,nfields,nfields1,binnum,irxn
-integer nbins,ntrtrack
+integer ntrtrack
+! Gas species written to the 3D output, selected by name so that changes
+! to the order of the ASP mechanism do not change what is written.
+! Species missing from the mechanism are skipped with a warning.
+character(len=20), parameter :: gas3d_names(93) = [character(len=20) :: &
+     'H2O','CO','CO2','RO2_T','RCO3_T','CH3O2','CH3CO3','Trace','NO','NO2', &
+     'O3','HO2','OH','H2O2','HONO','HNO4','SO2','SO3','HNO3','H2SO4','HCl', &
+     'NH3','O','O1D','NO3','N2O5','H2','CH4','HCHO','MEOH','Formic_Acid', &
+     'HCN','ETHE','Ethane','Acetaldehyde','ETOH','Acetic_Acid','GLY', &
+     'Acetylene','IVOC1','IVOC2','IVOC3','IVOC4','IVOC5','IVOC6','IVOC7', &
+     'IVOC8','IVOC9','IVOC1_R1O2','OXYARO','OTHERO','Propene','Propane', &
+     'ACR','Propanal','Acetone','IPROPOL','NPROPOL','PROPACID','MGLY', &
+     'Butadiene','1-Butene','cis-2-Butene','trans-2-Butene','i-Butene', &
+     'n-Butane','i-Butane','2-Butenal','Butanal','MEK','MethylPropanal', &
+     'NBUTOL','BUT2OL','IBUTOL','TBUTOL','BUTACID','IBUTACID','MVK','MCR', &
+     'ISOP','FURAN','ALD','API','BALD','BEN','CSL','DCB1','DCB2','DCB3', &
+     'DIEN','EPX','HC5','PAN' ]
+integer :: igas3d(size(gas3d_names)), ngas3d, igs
 
 character(len=6),dimension(51) :: JValNames
 real tmp(nx,ny,nzm)
@@ -250,7 +267,22 @@ AqCPD3ind = Find_Chem("AqCPD301")
 
 !nfields=ntracers+ngas+3!! number of 3D fields to save 
 !nfields=41+10+19+60!! number of 3D fields to save
-nfields=144 !130, adding Jvalues
+! gas species found in the mechanism (see gas3d_names)
+ngas3d = 0
+do igs = 1, size(gas3d_names)
+   n = 0
+   do k = 1, nGas
+      if (trim(GasPhaseChemicalNames(k)) == trim(gas3d_names(igs))) n = k
+   end do
+   if (n > 0) then
+      ngas3d = ngas3d + 1
+      igas3d(ngas3d) = n
+   else if (masterproc) then
+      print*, 'write_fields3D: gas ', trim(gas3d_names(igs)), &
+              ' is not in the ASP mechanism; not written'
+   end if
+end do
+nfields=51+ngas3d ! 51 fields besides the gas species
 if(.not.docloud) nfields=nfields-1
 if(.not.doprecip) nfields=nfields-1
 !bloss: add 3D outputs for microphysical fields specified by flag_micro3Dout
@@ -512,45 +544,28 @@ end if
 
 
 write(*,*) 'In write_fields3D '
-do n=1,92
+do igs=1,ngas3d
+  n = igas3d(igs)
   nfields1=nfields1+1
 
    do i=1,nx
       do j=1,ny
          do l=1,nzm
 
-            tmp(i,j,l)=tracer(i,j,l,n) ! use for values averaged of nsteps3D (in kg)
+            tmp(i,j,l)=tracer(i,j,l,itr_gas(n)) ! use for values averaged of nsteps3D (in kg)
 
             tmp(i,j,l) = tmp(i,j,l)*airmw/GasMolecularMass(n)*1e9
             std(i,j,l) = std(i,j,l)*airmw/GasMolecularMass(n)*1e9
-		
+
     end do
    end do
   end do
-  name=tracername(n)
-  long_name=tracername(n)
+  name=tracername(itr_gas(n))
+  long_name=tracername(itr_gas(n))
   units = '[ppb]'
   call compress3D(tmp,nx,ny,nzm,name,long_name,units, &
                                  save3Dbin,dompi,rank,nsubdomains)
 enddo
-
-nfields1=nfields1+1
-!write(*,*) 'In write_fields ',GasPhaseChemicalNames(167)! PANindex = 167
-do i=1,nx
-   do j=1,ny
-      do l=1,nzm
-            tmp(i,j,l)=tracer(i,j,l,167) ! use for values averaged of nsteps3D (in kg)
-	
-            tmp(i,j,l) = tmp(i,j,l)*airmw/GasMolecularMass(167)*1e9
-            std(i,j,l) = std(i,j,l)*airmw/GasMolecularMass(167)*1e9		
-      end do
-   end do
-end do
-name=tracername(167)
-long_name=tracername(167)
-units = '[ppb]'
-call compress3D(tmp,nx,ny,nzm,name,long_name,units, &
-                               save3Dbin,dompi,rank,nsubdomains)
 
 if(dotracers) then
   nfields1=nfields1+1
@@ -596,11 +611,11 @@ nfields1=nfields1+1
             prestm = dble(pres(l)*100.d0) + p(i,j,l) ! in Pa       
             temptm = dble(tabs(i,j,l)) ! in K
 	    airdenstm = prestm*Av/(gasc*temptm)/1.0d6! in molec/cm3
-            do binnum=1,10
+            do binnum=1,nBins
                !tmp(i,j,l)= tracer(i,j,l,(Kind+cur_index))*(airdenstm/Av*airmw)*1e12 ! kg/kg_air to ug/m3)
                !std(i,j,l)= tracer(i,j,l,(Kind+cur_index))*(airdenstm/Av*airmw)*1e12 ! kg/kg_air to ug/m3)
 
-               cur_index = 86*(binnum-1)
+               cur_index = nSpec*(binnum-1)
                 ! Org       
                TotOA(i,j,l) = TotOA(i,j,l) + (tracer(i,j,l,(POA1ind+cur_index))*(airdenstm/Av*airmw)*1e12) ! kg/kg_air to ug/m3)
                !write(*,*)'POA1 =',tracername(POA1ind+cur_index)
@@ -679,11 +694,11 @@ nfields1=nfields1+1
             prestm = dble(pres(l)*100.d0) + p(i,j,l) ! in Pa
             temptm = dble(tabs(i,j,l)) ! in K
             airdenstm = prestm*Av/(gasc*temptm)/1.0d6! in molec/cm3
-            do binnum=1,10
+            do binnum=1,nBins
                !tmp(i,j,l)= tracer(i,j,l,(Kind+cur_index))*(airdenstm/Av*airmw)*1e12 ! kg/kg_air to ug/m3)
                !std(i,j,l)= tracer(i,j,l,(Kind+cur_index))*(airdenstm/Av*airmw)*1e12 ! kg/kg_air to ug/m3)
 
-               cur_index = 86*(binnum-1)
+               cur_index = nSpec*(binnum-1)
                TotPOA(i,j,l) = TotPOA(i,j,l) + (tracer(i,j,l,(IVOC1ind+cur_index))*(airdenstm/Av*airmw)*1e12) ! kg/kg_air to ug/m3)
                TotPOA(i,j,l) = TotPOA(i,j,l) + (tracer(i,j,l,(IVOC2ind+cur_index))*(airdenstm/Av*airmw)*1e12) ! kg/kg_air to ug/m3)
                TotPOA(i,j,l) = TotPOA(i,j,l) + (tracer(i,j,l,(IVOC3ind+cur_index))*(airdenstm/Av*airmw)*1e12) ! kg/kg_air to ug/m3)
@@ -710,11 +725,11 @@ do i=1,nx
       prestm = dble(pres(l)*100.d0) + p(i,j,l) ! in Pa
       temptm = dble(tabs(i,j,l)) ! in K
       airdenstm = prestm*Av/(gasc*temptm)/1.0d6! in molec/cm3
-      do binnum=1,10
+      do binnum=1,nBins
                !tmp(i,j,l)= tracer(i,j,l,(Kind+cur_index))*(airdenstm/Av*airmw)*1e12 ! kg/kg_air to ug/m3)
                !std(i,j,l)= tracer(i,j,l,(Kind+cur_index))*(airdenstm/Av*airmw)*1e12 ! kg/kg_air to ug/m3)
 
-               cur_index = 86*(binnum-1)
+               cur_index = nSpec*(binnum-1)
                IVOC1Aer(i,j,l) = IVOC1Aer(i,j,l) + (tracer(i,j,l,(IVOC1ind+cur_index))*(airdenstm/Av*airmw)*1e12) ! kg/kg_air to ug/m3)
       end do ! end n
 
@@ -737,11 +752,11 @@ do i=1,nx
       prestm = dble(pres(l)*100.d0) + p(i,j,l) ! in Pa
       temptm = dble(tabs(i,j,l)) ! in K
       airdenstm = prestm*Av/(gasc*temptm)/1.0d6! in molec/cm3
-      do binnum=1,10
+      do binnum=1,nBins
                !tmp(i,j,l)= tracer(i,j,l,(Kind+cur_index))*(airdenstm/Av*airmw)*1e12 ! kg/kg_air to ug/m3)
                !std(i,j,l)= tracer(i,j,l,(Kind+cur_index))*(airdenstm/Av*airmw)*1e12 ! kg/kg_air to ug/m3)
 
-               cur_index = 86*(binnum-1)
+               cur_index = nSpec*(binnum-1)
                IVOC2Aer(i,j,l) = IVOC2Aer(i,j,l) + (tracer(i,j,l,(IVOC2ind+cur_index))*(airdenstm/Av*airmw)*1e12) ! kg/kg_air to ug/m3)
       end do ! end n
 
@@ -764,11 +779,11 @@ do i=1,nx
       prestm = dble(pres(l)*100.d0) + p(i,j,l) ! in Pa
       temptm = dble(tabs(i,j,l)) ! in K
       airdenstm = prestm*Av/(gasc*temptm)/1.0d6! in molec/cm3
-      do binnum=1,10
+      do binnum=1,nBins
                !tmp(i,j,l)= tracer(i,j,l,(Kind+cur_index))*(airdenstm/Av*airmw)*1e12 ! kg/kg_air to ug/m3)
                !std(i,j,l)= tracer(i,j,l,(Kind+cur_index))*(airdenstm/Av*airmw)*1e12 ! kg/kg_air to ug/m3)
 
-               cur_index = 86*(binnum-1)
+               cur_index = nSpec*(binnum-1)
                IVOC3Aer(i,j,l) = IVOC3Aer(i,j,l) + (tracer(i,j,l,(IVOC3ind+cur_index))*(airdenstm/Av*airmw)*1e12) ! kg/kg_air to ug/m3)
       end do ! end n
 
@@ -790,11 +805,11 @@ do i=1,nx
       prestm = dble(pres(l)*100.d0) + p(i,j,l) ! in Pa
       temptm = dble(tabs(i,j,l)) ! in K
       airdenstm = prestm*Av/(gasc*temptm)/1.0d6! in molec/cm3
-      do binnum=1,10
+      do binnum=1,nBins
                !tmp(i,j,l)= tracer(i,j,l,(Kind+cur_index))*(airdenstm/Av*airmw)*1e12 ! kg/kg_air to ug/m3)
                !std(i,j,l)= tracer(i,j,l,(Kind+cur_index))*(airdenstm/Av*airmw)*1e12 ! kg/kg_air to ug/m3)
 
-               cur_index = 86*(binnum-1)
+               cur_index = nSpec*(binnum-1)
                IVOC4Aer(i,j,l) = IVOC4Aer(i,j,l) + (tracer(i,j,l,(IVOC4ind+cur_index))*(airdenstm/Av*airmw)*1e12) ! kg/kg_air to ug/m3)
       end do ! end n
 
@@ -912,11 +927,11 @@ nfields1=nfields1+1
             prestm = dble(pres(l)*100.d0) + p(i,j,l) ! in Pa
             temptm = dble(tabs(i,j,l)) ! in K
             airdenstm = prestm*Av/(gasc*temptm)/1.0d6! in molec/cm3
-            do binnum=1,10
+            do binnum=1,nBins
                !tmp(i,j,l)= tracer(i,j,l,(Kind+cur_index))*(airdenstm/Av*airmw)*1e12 ! kg/kg_air to ug/m3)
                !std(i,j,l)= tracer(i,j,l,(Kind+cur_index))*(airdenstm/Av*airmw)*1e12 ! kg/kg_air to ug/m3)
 
-               cur_index = 86*(binnum-1)
+               cur_index = nSpec*(binnum-1)
                TotSOA(i,j,l) = TotSOA(i,j,l) + (tracer(i,j,l,(IVOC5ind+cur_index))*(airdenstm/Av*airmw)*1e12) ! kg/kg_air to ug/m3)
                TotSOA(i,j,l) = TotSOA(i,j,l) + (tracer(i,j,l,(IVOC6ind+cur_index))*(airdenstm/Av*airmw)*1e12) ! kg/kg_air to ug/m3)
                TotSOA(i,j,l) = TotSOA(i,j,l) + (tracer(i,j,l,(IVOC7ind+cur_index))*(airdenstm/Av*airmw)*1e12) ! kg/kg_air to ug/m3)
@@ -943,11 +958,11 @@ do i=1,nx
       prestm = dble(pres(l)*100.d0) + p(i,j,l) ! in Pa
       temptm = dble(tabs(i,j,l)) ! in K
       airdenstm = prestm*Av/(gasc*temptm)/1.0d6! in molec/cm3
-      do binnum=1,10
+      do binnum=1,nBins
                !tmp(i,j,l)= tracer(i,j,l,(Kind+cur_index))*(airdenstm/Av*airmw)*1e12 ! kg/kg_air to ug/m3)
                !std(i,j,l)= tracer(i,j,l,(Kind+cur_index))*(airdenstm/Av*airmw)*1e12 ! kg/kg_air to ug/m3)
 
-               cur_index = 86*(binnum-1)
+               cur_index = nSpec*(binnum-1)
                IVOC5Aer(i,j,l) = IVOC5Aer(i,j,l) + (tracer(i,j,l,(IVOC5ind+cur_index))*(airdenstm/Av*airmw)*1e12) ! kg/kg_air to ug/m3)
       end do ! end n
 
@@ -970,11 +985,11 @@ do i=1,nx
       prestm = dble(pres(l)*100.d0) + p(i,j,l) ! in Pa
       temptm = dble(tabs(i,j,l)) ! in K
       airdenstm = prestm*Av/(gasc*temptm)/1.0d6! in molec/cm3
-      do binnum=1,10
+      do binnum=1,nBins
                !tmp(i,j,l)= tracer(i,j,l,(Kind+cur_index))*(airdenstm/Av*airmw)*1e12 ! kg/kg_air to ug/m3)
                !std(i,j,l)= tracer(i,j,l,(Kind+cur_index))*(airdenstm/Av*airmw)*1e12 ! kg/kg_air to ug/m3)
 
-               cur_index = 86*(binnum-1)
+               cur_index = nSpec*(binnum-1)
                IVOC6Aer(i,j,l) = IVOC6Aer(i,j,l) + (tracer(i,j,l,(IVOC6ind+cur_index))*(airdenstm/Av*airmw)*1e12) ! kg/kg_air to ug/m3)
       end do ! end n
 
@@ -996,11 +1011,11 @@ do i=1,nx
       prestm = dble(pres(l)*100.d0) + p(i,j,l) ! in Pa
       temptm = dble(tabs(i,j,l)) ! in K
       airdenstm = prestm*Av/(gasc*temptm)/1.0d6! in molec/cm3
-      do binnum=1,10
+      do binnum=1,nBins
                !tmp(i,j,l)= tracer(i,j,l,(Kind+cur_index))*(airdenstm/Av*airmw)*1e12 ! kg/kg_air to ug/m3)
                !std(i,j,l)= tracer(i,j,l,(Kind+cur_index))*(airdenstm/Av*airmw)*1e12 ! kg/kg_air to ug/m3)
 
-               cur_index = 86*(binnum-1)
+               cur_index = nSpec*(binnum-1)
                IVOC7Aer(i,j,l) = IVOC7Aer(i,j,l) + (tracer(i,j,l,(IVOC7ind+cur_index))*(airdenstm/Av*airmw)*1e12) ! kg/kg_air to ug/m3)
       end do ! end n
 
@@ -1022,11 +1037,11 @@ do i=1,nx
       prestm = dble(pres(l)*100.d0) + p(i,j,l) ! in Pa
       temptm = dble(tabs(i,j,l)) ! in K
       airdenstm = prestm*Av/(gasc*temptm)/1.0d6! in molec/cm3
-      do binnum=1,10
+      do binnum=1,nBins
                !tmp(i,j,l)= tracer(i,j,l,(Kind+cur_index))*(airdenstm/Av*airmw)*1e12 ! kg/kg_air to ug/m3)
                !std(i,j,l)= tracer(i,j,l,(Kind+cur_index))*(airdenstm/Av*airmw)*1e12 ! kg/kg_air to ug/m3)
 
-               cur_index = 86*(binnum-1)
+               cur_index = nSpec*(binnum-1)
                IVOC8Aer(i,j,l) = IVOC8Aer(i,j,l) + (tracer(i,j,l,(IVOC8ind+cur_index))*(airdenstm/Av*airmw)*1e12) ! kg/kg_air to ug/m3)
       end do ! end n
 
@@ -1144,8 +1159,8 @@ call compress3D(IVOC8Gas,nx,ny,nzm,name,long_name,units, &
             temptm = dble(tabs(i,j,l)) ! in K
 	    airdenstm = prestm*Av/(gasc*temptm)/1.0d6! in molec/cm3
             !airmw g/mol
-            do binnum=1,10 ! starting aerosol species after number of gas species 
-               cur_index = 86*(binnum-1)
+            do binnum=1,nBins ! starting aerosol species after number of gas species 
+               cur_index = nSpec*(binnum-1)
                TotK(i,j,l) = TotK(i,j,l) + ((tracer(i,j,l,(Kind+cur_index))/MwK)*airmw*1e-3)! kg/kg_air to mol/mol)
                TotK(i,j,l) = TotK(i,j,l) + ((tracer(i,j,l,(KNO3ind+cur_index))/MwKNO3)*airmw*1e-3)! kg/kg_air to mol/mol)
                TotK(i,j,l) = TotK(i,j,l) + ((tracer(i,j,l,(KClind+cur_index))/MwKCl)*airmw*1e-3)! kg/kg_air to mol/mol)
@@ -1176,8 +1191,8 @@ nfields1=nfields1+1
             temptm = dble(tabs(i,j,l)) ! in K
 	    airdenstm = prestm*Av/(gasc*temptm)/1.0d6! in molec/cm3
             !airmw g/mol
-            do binnum=1,10 ! starting aerosol species after number of gas species 
-               cur_index = 86*(binnum-1)
+            do binnum=1,nBins ! starting aerosol species after number of gas species 
+               cur_index = nSpec*(binnum-1)
                TotNa(i,j,l) = TotNa(i,j,l) + ((tracer(i,j,l,(Naind+cur_index))/MwNa)*airmw*1e-3)! kg/kg_air to mol/mol)
 
                TotNa(i,j,l) = TotNa(i,j,l) + ((tracer(i,j,l,(NaNO3ind+cur_index))/MwNaNO3)*airmw*1e-3)! kg/kg_air to mol/mol)
@@ -1215,8 +1230,8 @@ nfields1=nfields1+1
             temptm = dble(tabs(i,j,l)) ! in K
 	    airdenstm = prestm*Av/(gasc*temptm)/1.0d6! in molec/cm3
             !airmw g/mol
-            do binnum=1,10 ! starting aerosol species after number of gas species 
-               cur_index = 86*(binnum-1)
+            do binnum=1,nBins ! starting aerosol species after number of gas species 
+               cur_index = nSpec*(binnum-1)
                !TotNH4(i,j,l) = TotNH4(i,j,l) + ((tracer(i,j,l,(NH3ind+cur_index))/MwNH3)*airmw*1e-3)! kg/kg_air to mol/mol)
                TotNH4(i,j,l) = TotNH4(i,j,l) + ((tracer(i,j,l,(NH3ind+cur_index))/MwNH3)*airmw*1e-3)! kg/kg_air to mol/mol)
                !write(*,*)tracername(NH3ind+cur_index)
@@ -1255,8 +1270,8 @@ nfields1=nfields1+1
             temptm = dble(tabs(i,j,l)) ! in K
 	    airdenstm = prestm*Av/(gasc*temptm)/1.0d6! in molec/cm3
             !airmw g/mol
-            do binnum=1,10 ! starting aerosol species after number of gas species 
-               cur_index = 86*(binnum-1)
+            do binnum=1,nBins ! starting aerosol species after number of gas species 
+               cur_index = nSpec*(binnum-1)
                TotCl(i,j,l) = TotCl(i,j,l) + ((tracer(i,j,l,(Clind+cur_index))/MwCl)*airmw*1e-3)! kg/kg_air to mol/mol)
 
                TotCl(i,j,l) = TotCl(i,j,l) + ((tracer(i,j,l,(NH4Clind+cur_index))/MwNH4Cl)*airmw*1e-3)! kg/kg_air to mol/mol)
@@ -1291,8 +1306,8 @@ nfields1=nfields1+1
             temptm = dble(tabs(i,j,l)) ! in K
 	    airdenstm = prestm*Av/(gasc*temptm)/1.0d6! in molec/cm3
             !airmw g/mol
-            do binnum=1,10 ! starting aerosol species after number of gas species 
-               cur_index = 86*(binnum-1)
+            do binnum=1,nBins ! starting aerosol species after number of gas species 
+               cur_index = nSpec*(binnum-1)
                TotNO3(i,j,l) = TotNO3(i,j,l) + ((tracer(i,j,l,(NO3ind+cur_index))/MwNO3)*airmw*1e-3)! kg/kg_air to mol/mol)
 
                TotNO3(i,j,l) = TotNO3(i,j,l) + ((tracer(i,j,l,(NH4NO3ind+cur_index))/MwNH4NO3)*airmw*1e-3)! kg/kg_air to mol/mol)
@@ -1329,8 +1344,8 @@ nfields1=nfields1+1
             temptm = dble(tabs(i,j,l)) ! in K
 	    airdenstm = prestm*Av/(gasc*temptm)/1.0d6! in molec/cm3
             !airmw g/mol
-            do binnum=1,10 ! starting aerosol species after number of gas species 
-               cur_index = 86*(binnum-1)
+            do binnum=1,nBins ! starting aerosol species after number of gas species 
+               cur_index = nSpec*(binnum-1)
                TotSO4(i,j,l) = TotSO4(i,j,l) + ((tracer(i,j,l,(SO4ind+cur_index))/MwSO4)*airmw*1e-3)! kg/kg_air to mol/mol)
                !write(*,*) tracername(SO4ind+cur_index)
                TotSO4(i,j,l) = TotSO4(i,j,l) + ((tracer(i,j,l,(NH42SO4ind+cur_index))/MwNH42SO4)*airmw*1e-3)! kg/kg_air to mol/mol)
@@ -1379,8 +1394,8 @@ nfields1=nfields1+1
             temptm = dble(tabs(i,j,l)) ! in K
 	    airdenstm = prestm*Av/(gasc*temptm)/1.0d6! in molec/cm3
             !airmw g/mol
-            do binnum=1,10 ! starting aerosol species after number of gas species 
-               cur_index = 86*(binnum-1)
+            do binnum=1,nBins ! starting aerosol species after number of gas species 
+               cur_index = nSpec*(binnum-1)
                TotMg(i,j,l) = TotMg(i,j,l) + ((tracer(i,j,l,(Mgind+cur_index))/MwMg)*airmw*1e-3)! kg/kg_air to mol/mol)
 
                TotMg(i,j,l) = TotMg(i,j,l) + ((tracer(i,j,l,(MgNO32ind+cur_index))/MwMgNO32)*airmw*1e-3)! kg/kg_air to mol/mol)
@@ -1415,8 +1430,8 @@ nfields1=nfields1+1
             temptm = dble(tabs(i,j,l)) ! in K
 	    airdenstm = prestm*Av/(gasc*temptm)/1.0d6! in molec/cm3
             !airmw g/mol
-            do binnum=1,10 ! starting aerosol species after number of gas species 
-               cur_index = 86*(binnum-1)
+            do binnum=1,nBins ! starting aerosol species after number of gas species 
+               cur_index = nSpec*(binnum-1)
                TotCa(i,j,l) = TotCa(i,j,l) + ((tracer(i,j,l,(Caind+cur_index))/MwCa)*airmw*1e-3)! kg/kg_air to mol/mol)
 
                TotCa(i,j,l) = TotCa(i,j,l) + ((tracer(i,j,l,(CaNO32ind+cur_index))/MwCaNO32)*airmw*1e-3)! kg/kg_air to mol/mol)
@@ -1444,7 +1459,8 @@ call compress3D(TotCa,nx,ny,nzm,name,long_name,units, &
 
 ! Number of Particles (No...)
 
-do n=1479,1488
+do binnum=1,nBins
+  n = itr_num(binnum)
   nfields1=nfields1+1
    do i=1,nx
       do j=1,ny

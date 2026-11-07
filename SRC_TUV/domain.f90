@@ -21,7 +21,11 @@ module domain
        integer, parameter :: navgmom_x = -1 
        integer, parameter :: navgmom_y = -1 
 
-       integer, parameter :: ntracers = 1489 ! Changed +2, NJ 8/28/23 number of transported tracers (dotracers=.true.)
+       ! number of transported tracers (dotracers=.true.). For SAM-ASP this must
+       ! equal the count implied by the ASP input decks: gases + bins*(aerosol
+       ! species + 1). The run stops at start-up with the right value if not
+       ! (see samasp_layout.f90). 618 + 10*(86+1) = 1488 for the current decks.
+       integer, parameter :: ntracers = 1488
        !integer, parameter :: ntracers = 617 ! number of transported tracers (dotracers=.true.)
 ! Note:
 !  * nx_gl and ny_gl should be a factor of 2,3, or 5 (see User's Guide)
