@@ -106,6 +106,14 @@
       REAL*8, INTENT(OUT) :: samwc(kw)
       INTEGER :: nupper
       LOGICAL, PARAMETER :: lsamout = .FALSE.
+* SAM-ASP: the set-up that does not change between calls (input file,
+* grids, atmosphere, spectral data, fixed optical depths) is done on the
+* first call only. All local variables are SAVEd so it is reused; only
+* the time (solar position) and the aerosol profile change between calls.
+      LOGICAL tuvinit
+      DATA tuvinit /.FALSE./
+      REAL dto2s(kz,kw)
+      SAVE
       REAL :: ztopsam, dzup
 
 * Wavelength grid:
@@ -320,6 +328,7 @@
 * Open log file:
 
 c      OPEN(UNIT=kout,FILE='tuvlog',STATUS='UNKNOWN')
+      IF (.NOT. tuvinit) THEN
       OPEN(UNIT=kout,FILE='../'//'tuvlog'//'.txt',STATUS='UNKNOWN')
 
 * ___ SECTION 1: SIMPLE INPUT VARIABLES --------------------------------
@@ -509,14 +518,8 @@ c      izfix = 0
 !              nwint = -7 to pick fastTUV, tropospheric wavelengths only
 !              nwint = -12 for fastJ2
       nwint = -7
-      tstart = samtstart
       nt = 1 !Only calculate one timestep
-      lat = REAL(samlat)
-      lon = REAL(samlon)
       tmzone = 0
-      iyear = samyear
-      imonth = sammonth
-      iday = samday
 !END MJA 20190616 FORCED INPUTS      
       
       IF(nstr .LT. 2) THEN
@@ -559,10 +562,6 @@ c      izfix = 0
 
 * time/zenith (creates time/zenith angle grid, starting at tstart)
 
-      CALL gridt(lat, lon, tmzone,
-     $     iyear, imonth, iday,
-     $     lzenit, tstart, tstop,
-     $     nt, t, sza, esfact)
 
 * wavelength grid, user-set range and spacing. 
 * NOTE:  Wavelengths are in vacuum, and therefore independent of altitude.
@@ -760,43 +759,6 @@ c      CALL newlst(ns,slabel,nj,jlabel)
 
 * Aerosol vertical profile, optical depths, single scattering albedo, asymmetry factor
 
-      CALL setaer(ipbl, zpbl, aod330,
-     $     tauaer, ssaaer, alpha,
-     $     nz, z, nw, wl,
-     $     dtaer, omaer, gaer)
-
-*     !MJA 20190616 Overwrite the bottom of the aerosol profile with the SAM-ASP output  
-*     !Loop over SAM-ASP heights and wavelengths
-*     !NOTE: SAM-ASP alt and wv grid and TUV alt and wv grid must match exactly!    
-      do iz = 1, nsamz
-        do iw = 1, nw-1
-            !write(*,*) "iz: ", iz, "iw:", iw
-            dtaer(iz, iw) = samAOD(iz,iw) 
-            omaer(iz,iw) = samSSA(iz,iw)
-            gaer(iz,iw) = samASYM(iz,iw)
-        enddo
-      enddo
- 
-      ! MM DEBUG
-      ! loop over all layers   
-      do iz = 1, kz
-        do iw = 1, kw      
-        !Force non-zero values to protect against input errors
-           if (dtaer(iz, iw) .LE. 1.0e-20) dtaer(iz, iw) = 1.0e-20
-           if (omaer(iz, iw) .LE. 1.0e-20) omaer(iz, iw) = 0.99
-           if (ABS(gaer(iz,iw)) .LE. 1.0e-20) gaer(iz,iw) = 0.61
-        enddo
-      enddo
-
-      !Fix top layer, at every wavelength (this used to run after the
-      !iw loop had ended, i.e. with iw = kw+1, out of bounds)
-      !(the top layer is nz-1; it used to be fixed at 193)
-      do iw = 1, kw
-      !dtaer(nz-1, iw) = 0.0
-      dtaer(nz-1, iw) = 1.0E-20 ! MM DEBUG
-      omaer(nz-1,iw) = 1.0
-      gaer(nz-1,iw) = 0.0
-      enddo
      
       !do iz = 1, nz
       !  write(*,*) "iz: ", iz
@@ -841,6 +803,73 @@ c      CALL newlst(ns,slabel,nj,jlabel)
 
       CALL setalb(alsurf,nw,wl,
      $     albedo)
+
+* keep the set-up O2 optical depths (la_srb may change dto2 per call)
+      DO iw = 1, kw
+         DO iz = 1, kz
+            dto2s(iz,iw) = dto2(iz,iw)
+         ENDDO
+      ENDDO
+      tuvinit = .TRUE.
+      ENDIF
+* ---- end of the one-time set-up; the rest is done on every call ----
+
+* time, site and date from SAM, and the solar position
+      tstart = samtstart
+      lat = REAL(samlat)
+      lon = REAL(samlon)
+      iyear = samyear
+      imonth = sammonth
+      iday = samday
+      CALL gridt(lat, lon, tmzone,
+     $     iyear, imonth, iday,
+     $     lzenit, tstart, tstop,
+     $     nt, t, sza, esfact)
+
+      DO iw = 1, kw
+         DO iz = 1, kz
+            dto2(iz,iw) = dto2s(iz,iw)
+         ENDDO
+      ENDDO
+
+* aerosols: TUV's default profile, with SAM-ASP's in SAM's layers
+      CALL setaer(ipbl, zpbl, aod330,
+     $     tauaer, ssaaer, alpha,
+     $     nz, z, nw, wl,
+     $     dtaer, omaer, gaer)
+
+*     !MJA 20190616 Overwrite the bottom of the aerosol profile with the SAM-ASP output  
+*     !Loop over SAM-ASP heights and wavelengths
+*     !NOTE: SAM-ASP alt and wv grid and TUV alt and wv grid must match exactly!    
+      do iz = 1, nsamz
+        do iw = 1, nw-1
+            !write(*,*) "iz: ", iz, "iw:", iw
+            dtaer(iz, iw) = samAOD(iz,iw) 
+            omaer(iz,iw) = samSSA(iz,iw)
+            gaer(iz,iw) = samASYM(iz,iw)
+        enddo
+      enddo
+ 
+      ! MM DEBUG
+      ! loop over all layers   
+      do iz = 1, kz
+        do iw = 1, kw      
+        !Force non-zero values to protect against input errors
+           if (dtaer(iz, iw) .LE. 1.0e-20) dtaer(iz, iw) = 1.0e-20
+           if (omaer(iz, iw) .LE. 1.0e-20) omaer(iz, iw) = 0.99
+           if (ABS(gaer(iz,iw)) .LE. 1.0e-20) gaer(iz,iw) = 0.61
+        enddo
+      enddo
+
+      !Fix top layer, at every wavelength (this used to run after the
+      !iw loop had ended, i.e. with iw = kw+1, out of bounds)
+      !(the top layer is nz-1; it used to be fixed at 193)
+      do iw = 1, kw
+      !dtaer(nz-1, iw) = 0.0
+      dtaer(nz-1, iw) = 1.0E-20 ! MM DEBUG
+      omaer(nz-1,iw) = 1.0
+      gaer(nz-1,iw) = 0.0
+      enddo
 
 * Set any additional absorber or scatterer:
 * Must populate dt_any(kz,kw), om_any(kz,kw), g_any(kz,kw) manually
