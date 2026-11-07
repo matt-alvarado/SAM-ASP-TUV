@@ -440,3 +440,8 @@ Timings are asptest (30 steps, 16 MPI ranks oversubscribed on this machine).
     inorganic equilibrium amplifies that to up to ~60% in a few cells of
     TotNO3/NH3/TotSO4 (most fields ~3e-6 relative). Without precise FP,
     any edit of `tracers.f90` can do the same.
+- *SAM compiled with `-fp-model precise` by default* (`Makefile`, `SAM_FP`;
+  override with `SAM_FP=` on the make command line or in the environment):
+  for the reason above. Changes SAM's results once at the rounding level;
+  ~3% slower. asptest from the repository build: 117 s, output identical to
+  the verified precise balanced run.
