@@ -304,6 +304,8 @@ species in `GasPhaseChems.in`: outputs must still be labelled correctly.
   ObjectFiles/, ModuleFiles/, asp_v2.1.1_linux_ifort_dbl, and the root
   libAspLibrary.a link) and the old ASP copy under SRC/ASP have been removed.
   The ASP Makefile creates ObjectFiles/ and ModuleFiles/ when it builds.
+- The stale ifort TUV objects (SRC_TUV/TUV/*.o, libTuvLibrary.a and the root
+  libTuvLibrary.a link) have been removed as well.
 
 **Question 3 (derived J-values 49–51) — answered**
 - Intended: 49 = 0.33·J(C2H5CHO) (butanal's first channel and 22 other

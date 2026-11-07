@@ -16,3 +16,6 @@ __pycache__/
 /SRC_TUV/ASP/ModuleFiles/
 /SRC_TUV/ASP/libAspLibrary.a
 /SRC_TUV/ASP/asp_v2.1.1_linux_ifort_dbl
+# In-place TUV build outputs (SRC_TUV/TUV/Makefile_SAM without TUV_BUILD_DIR)
+/SRC_TUV/TUV/*.o
+/SRC_TUV/TUV/libTuvLibrary.a
