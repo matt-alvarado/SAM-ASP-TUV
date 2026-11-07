@@ -41,7 +41,13 @@ character(len=20), parameter :: gas3d_names(93) = [character(len=20) :: &
      'DIEN','EPX','HC5','PAN' ]
 integer :: igas3d(size(gas3d_names)), ngas3d, igs
 
-character(len=6),dimension(51) :: JValNames
+! J-values written to the 3D output, chosen by TUV reaction label; each is
+! written as JValNN, NN being the ASP photolysis column it feeds
+! (PhotoMap.in). Labels with no scale-1 column there are skipped.
+character(len=50), parameter :: jval3d_labels(4) = [character(len=50) :: &
+     'O3 -> O2 + O(1D)', 'H2O2 -> 2 OH', 'HNO2 -> OH + NO', 'HNO4 -> HO2 + NO2' ]
+integer :: jcol3d(size(jval3d_labels)), njval3d
+character(len=6) :: jvalname
 real tmp(nx,ny,nzm)
 !real TotalOA_01(nx,ny,nzm)
 !real TotalOA_02(nx,ny,nzm)
@@ -147,12 +153,6 @@ Integer :: 	Kind,KNO3ind, KClind, K2SO4ind, KHSO4ind, KOHind, Naind , NaNO3ind, 
                 IVOC3indg,IVOC4indg,IVOC5indg,IVOC6indg,IVOC7indg,IVOC8indg
 
 
-JValNames = (/'JVal01','JVal02','JVal03','JVal04','JVal05','JVal06','JVal07','JVal08','JVal09','JVal10', &
-            'JVal11','JVal12','JVal13','JVal14','JVal15','JVal16','JVal17','JVal18','JVal19','JVal20', &
-            'JVal21','JVal22','JVal23','JVal24','JVal25','JVal26','JVal27','JVal28','JVal29','JVal30',&
-            'JVal31','JVal32','JVal33','JVal34','JVal35','JVal36','JVal37','JVal38','JVal39','JVal40',&
-            'JVal41','JVal42','JVal43','JVal44','JVal45','JVal46','JVal47','JVal48','JVal49','JVal50',&
-            'JVal51'/)
 BCind = Find_Chem("BC01")
 Kind = Find_Chem("K+01")
 KNO3ind = Find_Chem("KNO301")
@@ -282,7 +282,19 @@ do igs = 1, size(gas3d_names)
               ' is not in the ASP mechanism; not written'
    end if
 end do
-nfields=51+ngas3d ! 51 fields besides the gas species
+! J-value outputs (see jval3d_labels)
+njval3d = 0
+do igs = 1, size(jval3d_labels)
+   k = photo_col_of_label(jval3d_labels(igs))
+   if (k > 0) then
+      njval3d = njval3d + 1
+      jcol3d(njval3d) = k
+   else if (masterproc) then
+      print*, 'write_fields3D: no PhotoMap.in column for TUV reaction ', &
+              trim(jval3d_labels(igs)), '; not written'
+   end if
+end do
+nfields=47+ngas3d+njval3d ! 47 fields besides the gas species and J-values
 if(.not.docloud) nfields=nfields-1
 if(.not.doprecip) nfields=nfields-1
 !bloss: add 3D outputs for microphysical fields specified by flag_micro3Dout
@@ -1505,58 +1517,22 @@ do n = 1,nmicro_fields
    end if
 end do
 
-! Selected J Values
+! Selected J Values (see jval3d_labels)
+do igs=1,njval3d
 nfields1=nfields1+1
 do i=1,nx
   do j=1,ny
     do l=1,nzm
-      tmp(i,j,l) = PhotoArr(i,j,l,2)
+      tmp(i,j,l) = PhotoArr(i,j,l,jcol3d(igs))
     enddo
   enddo
 enddo
-name=JValNames(2)
-long_name=JValNames(2)
+write(jvalname,'(a,i2.2)') 'JVal', jcol3d(igs)
+name=jvalname
+long_name=jvalname
 units= '1/s'
 call compress3D(tmp,nx,ny,nzm,name,long_name,units,save3Dbin,dompi,rank,nsubdomains)
-
-nfields1=nfields1+1
-do i=1,nx
-  do j=1,ny
-    do l=1,nzm
-      tmp(i,j,l) = PhotoArr(i,j,l,5)
-    enddo
-  enddo
 enddo
-name=JValNames(5)
-long_name=JValNames(5)
-units= '1/s'
-call compress3D(tmp,nx,ny,nzm,name,long_name,units,save3Dbin,dompi,rank,nsubdomains)
-
-nfields1=nfields1+1
-do i=1,nx
-  do j=1,ny
-    do l=1,nzm
-      tmp(i,j,l) = PhotoArr(i,j,l,12)
-    enddo
-  enddo
-enddo
-name=JValNames(12)
-long_name=JValNames(12)
-units= '1/s'
-call compress3D(tmp,nx,ny,nzm,name,long_name,units,save3Dbin,dompi,rank,nsubdomains)
-
-nfields1=nfields1+1
-do i=1,nx
-  do j=1,ny
-    do l=1,nzm
-      tmp(i,j,l) = PhotoArr(i,j,l,14)
-    enddo
-  enddo
-enddo
-name=JValNames(14)
-long_name=JValNames(14)
-units= '1/s'
-call compress3D(tmp,nx,ny,nzm,name,long_name,units,save3Dbin,dompi,rank,nsubdomains)
 
 
   call task_barrier()

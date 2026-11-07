@@ -1,0 +1,74 @@
+!! PhotoMap.in
+!! Photolysis rates passed from TUV to ASP in SAM-ASP-TUV.
+!!
+!! Each line sets (or adds to) one ASP photolysis rate column, i.e. the
+!! column number used for photolysis reactions in GasChemicalMechanism.in
+!! ("; 0.; N.") and in PhotoRates.in, from one TUV photolysis reaction:
+!!
+!!     ASP column ; scale factor ; TUV reaction label
+!!
+!! The label must match TUV's label exactly (as listed in TUV's input file
+!! SRC_TUV/TUV/INPUTS/samasp, without the leading T/F and number), and that
+!! reaction must be switched on (T) there. Lines with the same column are
+!! summed. A column used by the mechanism with no line here, an unknown
+!! label, or a column outside PhotoRates.in stops the run at start-up.
+!!
+!! Columns 49-51 have no TUV reaction; they are set from TUV rates for
+!! similar species with constant ratios:
+!!   49 = 0.33 x J(propanal)    (butanal channel 1 and other aldehydes)
+!!   50 = 0.16 x J(propanal)    (butanal channel 2)
+!!   51 = 100  x J(methacrolein) (HPALD1, HPALD2)
+!!
+  1 ; 1.0  ; O2 -> O + O
+  2 ; 1.0  ; O3 -> O2 + O(1D)
+  3 ; 1.0  ; O3 -> O2 + O(3P)
+  4 ; 1.0  ; HO2 -> OH + O
+  5 ; 1.0  ; H2O2 -> 2 OH
+  6 ; 1.0  ; NO2 -> NO + O(3P)
+  7 ; 1.0  ; NO3 -> NO + O2
+  8 ; 1.0  ; NO3 -> NO2 + O(3P)
+  9 ; 1.0  ; N2O5 -> NO3 + NO + O(3P)
+ 10 ; 1.0  ; N2O5 -> NO3 + NO2
+ 11 ; 1.0  ; N2O -> N2 + O(1D)
+ 12 ; 1.0  ; HNO2 -> OH + NO
+ 13 ; 1.0  ; HNO3 -> OH + NO2
+ 14 ; 1.0  ; HNO4 -> HO2 + NO2
+ 15 ; 1.0  ; NO3-(aq) -> NO2(aq) + O-
+ 16 ; 1.0  ; NO3-(aq) -> NO2-(aq) + O(3P)
+ 17 ; 1.0  ; CH2O -> H + HCO
+ 18 ; 1.0  ; CH2O -> H2 + CO
+ 19 ; 1.0  ; CH3CHO -> CH3 + HCO
+ 20 ; 1.0  ; CH3CHO -> CH4 + CO
+ 21 ; 1.0  ; CH3CHO -> CH3CO + H
+ 22 ; 1.0  ; C2H5CHO -> C2H5 + HCO
+ 23 ; 1.0  ; HOCH2CHO -> CH2OH + HCO
+ 23 ; 1.0  ; HOCH2CHO -> CH3OH + CO
+ 23 ; 1.0  ; HOCH2CHO -> CH2CHO + OH
+ 24 ; 1.0  ; CH2=CHCHO -> Products
+ 25 ; 1.0  ; CH2=C(CH3)CHO -> Products
+ 26 ; 1.0  ; CH3COCH3 -> CH3CO + CH3
+ 27 ; 1.0  ; CH3COCH=CH2 -> Products
+ 28 ; 1.0  ; CH3COCH2CH3 -> CH3CO + CH2CH3
+ 29 ; 1.0  ; CH2(OH)COCH3 -> CH3CO + CH2(OH)
+ 30 ; 1.0  ; CH2(OH)COCH3 -> CH2(OH)CO + CH3
+ 31 ; 1.0  ; CH3OOH -> CH3O + OH
+ 32 ; 1.0  ; HOCH2OOH -> HOCH2O. + OH
+ 33 ; 1.0  ; CH3CO(OOH) -> Products
+ 34 ; 1.0  ; CH3ONO2 -> CH3O + NO2
+ 35 ; 1.0  ; CH3CH2ONO2 -> CH3CH2O + NO2
+ 36 ; 1.0  ; CH3CHONO2CH3 -> CH3CHOCH3 + NO2
+ 37 ; 1.0  ; CH2(OH)CH2(ONO2) -> CH2(OH)CH2(O.) + NO2
+ 38 ; 1.0  ; CH3COCH2(ONO2) -> CH3COCH2(O.) + NO2
+ 39 ; 1.0  ; C(CH3)3(ONO2) -> C(CH3)3(O.) + NO2
+ 40 ; 1.0  ; CH3CO(OONO2) -> CH3CO(OO) + NO2
+ 41 ; 1.0  ; CH3CO(OONO2) -> CH3CO(O) + NO3
+ 42 ; 1.0  ; CH3CH2CO(OONO2) -> CH3CH2CO(OO) + NO2
+ 43 ; 1.0  ; CH3CH2CO(OONO2) -> CH3CH2CO(O) + NO3
+ 44 ; 1.0  ; CHOCHO -> HCO + HCO
+ 45 ; 1.0  ; CHOCHO -> CH2O + CO
+ 46 ; 1.0  ; CH3COCHO -> CH3CO + HCO
+ 47 ; 1.0  ; CH3COCOCH3 -> Products
+ 48 ; 1.0  ; CH3COCO(OH) -> Products
+ 49 ; 0.33 ; C2H5CHO -> C2H5 + HCO
+ 50 ; 0.16 ; C2H5CHO -> C2H5 + HCO
+ 51 ; 100. ; CH2=C(CH3)CHO -> Products

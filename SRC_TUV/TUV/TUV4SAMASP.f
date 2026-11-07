@@ -38,7 +38,7 @@
 
 
       SUBROUTINE tuv4samasp(samtstart, nsamz,samAOD, samSSA, 
-     $                      samASYM, samvalj)
+     $                      samASYM, samvalj, samnj, samjlabel)
 *-----------------------------------------------------------------------------*
 *=    Tropospheric Ultraviolet-Visible (TUV) radiation model                 =*
 *=    Version 5.3                                                            =*
@@ -82,8 +82,13 @@
       REAL*8, INTENT(IN) :: samtstart !Time (hr) in UTC
       INTEGER, INTENT(IN) :: nsamz ! Number of altitude layers from SAM-ASP, less than nz for TUV
       REAL*8, INTENT(IN) :: samAOD(kz,kw), samSSA(kz,kw), samASYM(kz,kw) 
+* J-values of the selected TUV reactions, in the order they are
+* selected in the TUV input file: samvalj(ij,iz) for ij = 1..samnj,
+* with labels samjlabel(ij). SAM maps them to ASP's photolysis columns
+* (samasp_photo.f90, input deck PhotoMap.in).
       REAL*8, INTENT(OUT) :: samvalj(kj,kz) 
-      INTEGER :: sammap(kj), indmja
+      INTEGER, INTENT(OUT) :: samnj
+      CHARACTER*50, INTENT(OUT) :: samjlabel(kj)
 
 * Wavelength grid:
 
@@ -990,46 +995,17 @@ c            dt_any(iz,iw) = 0.79*aircol(iz) * 2.e-17 ! N2 VUV absorption
      $        rate, valj,
      $        svr_zs, svj_zj, svr_zt, svj_zt, svr_ts, svj_tj)
 
-    !MJA 20190616 Only pass back the values needed by SAM-ASP
-    !@@TODO check indices!
-        !Maps from TUV v5.3.2 indices to SAM-ASP indices
-         sammap(1:59) = [ 1,  2,  3,  4,  5,  6,  7,  8, 11,  9,
-     $             10, 12, 13, 14, 15, 16, -1, 17, 18, 19,
-     $             20, 21, 22, 31, 32, 34, -1, 35, -1, -1,
-     $             -1, -1, 36, 37, 38, 39, -1, 40, 41, 42,
-     $             43, 24, 25, 27, 23, 23, 23, 26, 28, 29,
-     $             30, 44, -1, 45, 46, 47, -1, 33, 48]
-
-	 !write (*,*) "TUV4SAMASP L941 valj(:,1)",valj(:,1) !AD DEBUG
+    !Pass back the J-values of the selected reactions and their labels;
+    !the mapping to ASP's photolysis columns is done in SAM
+    !(samasp_photo.f90, PhotoMap.in)
          samvalj(:,:) = 0.0
-         !write(*,*), "TUV4SAMASP samvalj nz levels", nz !AD DEBUG
-         !write(*,*), "TUV4SAMASP valj kz levels", kz !AD DEBUG
-         !imj holds the nmj selected reactions; nj counts all of them
+         samnj = nmj
          do ij = 1, nmj
+            samjlabel(ij) = jlabel(imj(ij))
             do iz = 1, nz
-                indmja = sammap(imj(ij))
-                !TUV reactions with no ASP column are mapped to -1;
-                !skip them (writing samvalj(-1,iz) is out of bounds)
-                if (indmja .LT. 1) cycle
-                !Shuttle tuv's valj into the right spot for samasp
-                !which is given by indmja (the sammap index)
-                samvalj(indmja,iz) = samvalj(indmja,iz) 
-     $                                        + valj(imj(ij),iz)
-                if (iz .EQ. 1) then
-                    write (*,*) "ij: ", ij, "imj: ", imj(ij), 
-     $                          "sam index: ", sammap(imj(ij))
-                    write(*,*) "jlabel: ", jlabel(imj(ij)) 
-                    write (*,*) "valj: ", valj(imj(ij),iz)
-                    write (*,*) "samvalj: ", samvalj(sammap(imj(ij)),iz)
-!                    write (*,*) "nj:", nj !AD DEBUG
-                endif
+                samvalj(ij,iz) = valj(imj(ij),iz)
             enddo
          enddo
-         !add in the three externally calculated j's
-         !TODO check indices!
-         samvalj(49,iz) = 0.33*valj(imj(23),iz)
-         samvalj(50,iz) = 0.16*valj(imj(23),iz)                
-         samvalj(51,iz) = 100*valj(imj(43),iz)         
  20   CONTINUE
 
 * output in-water doses

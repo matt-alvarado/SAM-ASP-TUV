@@ -21,6 +21,7 @@ module tracers
  use GridPointFields
  use InfrastructuralCode
  use samasp_layout
+ use samasp_photo
  implicit none
 
  real tracer  (dimx1_s:dimx2_s, dimy1_s:dimy2_s, nzm, 0:ntracers)
@@ -36,11 +37,16 @@ module tracers
  REAL*8 ExtCoeffArr(dimx1_s:dimx2_s, dimy1_s:dimy2_s, nzm, 7)
  REAL*8 SingScatArr(dimx1_s:dimx2_s, dimy1_s:dimy2_s, nzm, 7)
  REAL*8 AssymArr(dimx1_s:dimx2_s, dimy1_s:dimy2_s, nzm, 7)
- REAL*8 PhotoArr(dimx1_s:dimx2_s, dimy1_s:dimy2_s, nzm, 51)
+ ! J-values by ASP photolysis rate column (nPhoto columns, see samasp_photo)
+ REAL*8, allocatable :: PhotoArr(:,:,:,:)
 !REAL*8 :: samtstart, samAOD(nzm,7), samSSA(nzm,7), samASYM(nzm,7), samvalj(nzm,51)
 !REAL*8 :: samtstart, samAOD(nzm,7), samSSA(nzm,7), samASYM(nzm,7), samvalj(51,nzm) !AD DEBUG
 ! use same array dimensions as TUV4SAMASP
 REAL*8 :: samtstart, samAOD(200,8), samSSA(200,8), samASYM(200,8), samvalj(150,200) !MM DEBUG
+! TUV's selected reactions (count and labels) and J-values mapped to ASP columns
+integer :: samnj
+character(len=50) :: samjlabel(150)
+REAL*8, allocatable :: jasp(:,:)
  character *20 tracername(0:ntracers)
  character *10 tracerunits(0:ntracers)
  character *20 aero_name
@@ -214,6 +220,10 @@ END FUNCTION
   write(*,*) 'After InitializeASP.... '
   ! Tracer layout from ASP's species counts; stops if ntracers does not match
   call samasp_layout_init(ntracers, masterproc)
+  ! TUV -> ASP photolysis mapping (PhotoMap.in); stops if it is inconsistent
+  call samasp_photo_init(trim(asp_deck_dir), masterproc)
+  allocate(PhotoArr(dimx1_s:dimx2_s, dimy1_s:dimy2_s, nzm, nPhoto), jasp(nzm, nPhoto))
+  PhotoArr = 0.
   allocate(GasConc(nGas), AeroNumConc(nBins), AeroMassConc(nBins,nSpec), &
            AeroNumConcCheck(nBins), AeroMassConcCheck(nBins,nSpec), &
            Radius(nBins), TermVel(nBins), EnvNumConc(nBins), EnvMass(nBins,nSpec))
@@ -597,7 +607,7 @@ enddo ! nx
       !REAL*8 :: TermVel(HowManyEvolveGasChems)  !!MM DEBUG
       REAL*8 :: TermVel(nBins) 
       REAL*8 :: t_TotOA   
-      REAL*8 :: PhotolysisRates(51)   
+      REAL*8 :: PhotolysisRates(nPhoto)   
       ! ---------------------- end from ASP
 
 
@@ -926,7 +936,7 @@ enddo ! nx
                 !MJA 20190702 Add photolysis rate input
 
                 write(*,*) "Before input PhotolysisRates"
-                do irxn=1,51
+                do irxn=1,nPhoto
 !                     PhotolysisRates(irxn) = PhotoArr(i,j,kk,irxn)
                       PhotolysisRates(irxn) = PhotoArr(i,j,l,irxn) ! AD DEBUG
                 enddo
@@ -935,16 +945,14 @@ enddo ! nx
                 !write(*,*) "z level 'l':", l
                 !write(*,*) "samvalj(:,l)",samvalj(:,l)
                 !write(*,*) "PhotolysisRates going into SAM_wrapper", PhotolysisRates !AD DEBUG
-                do irxn=1,51 !AD DEBUG
+                do irxn=1,nPhoto !AD DEBUG
 !                     PhotolysisRates(irxn) = PhotoArr(i,j,kk,irxn) !AD DEBUG
 		     PhotolysisRates(irxn) = PhotoArr(i,j,l,irxn) !AD DEBUG above ... shouldn't be kk (not defined till L1180)?	
 !                      PhotolysisRates(irxn) = 0 ! AD DEBUG
                 enddo !AD DEBUG
 
-                !calculate photo rates not provided by TUV
-                PhotolysisRates(49) = 0.33*PhotolysisRates(22)
-                PhotolysisRates(50) = 0.16*PhotolysisRates(22)
-                PhotolysisRates(51) = 100*PhotolysisRates(25)
+                ! Rates for species not in TUV (e.g. columns 49-51) are set
+                ! with their scale factors in PhotoMap.in (samasp_photo_map)
 
 		write(*,*) "PhotolysisRates passed to SAM_wrapper: ", PhotolysisRates !AD DEBUG
 		!call flush(6) !AD DEBUG
@@ -1230,18 +1238,15 @@ enddo ! nx
          ! end MM DEBUG BLOCK
          
          write(*,*) "Before tuv4samasp", samtstart
-         call tuv4samasp(samtstart, nzm,samAOD, samSSA, samASYM, samvalj)
+         call tuv4samasp(samtstart, nzm,samAOD, samSSA, samASYM, samvalj, &
+                         samnj, samjlabel)
          write(*,*) "After tuv4samasp"
-         !Store PhotolysisRates for next time step
+         ! Map TUV's J-values to ASP's photolysis columns (PhotoMap.in) and
+         ! store them for the next time step
+         if (.not. photo_labels_set) call samasp_photo_set_labels(samnj, samjlabel)
+         call samasp_photo_map(samnj, nzm, samvalj, jasp)
          do kk=1,nzm
-            do irxn=1,51
-!               PhotoArr(i,j,kk,irxn) = samvalj(kk,irxn)
-	       PhotoArr(i,j,kk,irxn) = samvalj(irxn,kk) !AD DEBUG
-               !write(*,*) "kk, irxn********************",kk,irxn !AD DEBUG
-               !write(*,*) "samvalj(:,:)",samvalj(irxn,kk) !AD DEBUG
-               !write(*,*) "PhotoArr(i,j,:,:)",PhotoArr(i,j,kk,irxn)!AD DEBUG
-	       
-            enddo !irxn=1,51
+            PhotoArr(i,j,kk,:) = jasp(kk,:)
          enddo !kk=1,nzm
          write(*,*) "After store PhotolysisRates"
       enddo
