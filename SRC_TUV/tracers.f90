@@ -12,7 +12,7 @@ module tracers
 
  use grid
  use StepASP, ONLY: InitializeASP, ASPInterface, &
-      SAM_wrapper, StepASPOnce, OutputConcentrations
+      SAM_wrapper, StepASPOnce, OutputConcentrations, SetASPCellReset
  use Chemistry
  use Aerosols
  use Condensation
@@ -22,6 +22,7 @@ module tracers
  use InfrastructuralCode
  use samasp_layout
  use samasp_photo
+ use samasp_balance, only: balanced_compute
  implicit none
 
  real tracer  (dimx1_s:dimx2_s, dimy1_s:dimy2_s, nzm, 0:ntracers)
@@ -576,6 +577,14 @@ enddo ! nx
       enddo
    endif
 
+ ! With MPI, make every ASP call start from the particle state saved here
+ ! (identical on all ranks), so a cell's result does not depend on which
+ ! cells were computed before it on the same rank (or on which rank).
+ if (dompi) then
+    call SetASPCellReset(.true.)
+    if (masterproc) write(*,*) 'ASP cell-state reset on (MPI run)'
+ end if
+
  end subroutine tracers_init
 
  subroutine tracers_flux()
@@ -625,6 +634,10 @@ enddo ! nx
       REAL*8 :: TermVel(nBins) 
       REAL*8 :: t_TotOA   
       REAL*8 :: PhotolysisRates(nPhoto)   
+      ! plume cells of this rank, their ASP inputs and outputs
+      integer :: ncell, icell
+      integer, allocatable :: cell_ijl(:,:)
+      real*8, allocatable :: aspin(:,:), aspout(:,:), cell_aird(:)
       ! ---------------------- end from ASP
 
 
@@ -718,6 +731,12 @@ enddo ! nx
          endif ! rank eq 5
       endif ! nstep eq.
 
+   ! ASP is run in three passes so that, with MPI, the plume cells of all
+   ! ranks can be shared out evenly (samasp_balance): (1) collect the ASP
+   ! inputs of this rank's plume cells, (2) run ASP on them, (3) store the
+   ! results; then TUV is run for each column.
+   ncell = 0
+   allocate(aspin(asp_nin(), 64), cell_ijl(3, 64), cell_aird(64))
    do i=1,nx
    !write (*,*) "i,nx", i, nx  !AD DEBUG
       do j=1,ny
@@ -950,55 +969,33 @@ enddo ! nx
 	        enddo
 !write(*,*) "Fire Loop L963 sum(tracer(i,j,l,:))", sum(tracer(i,j,l,:)) !AD DEBUG
 !write(*,*) "Fire Loop tracers.f90 sum(tracer) L963", sum(tracer) !AD DEBUG
-                !MJA 20190702 Add photolysis rate input
-
                 write(*,*) "Before input PhotolysisRates"
-                do irxn=1,nPhoto
-!                     PhotolysisRates(irxn) = PhotoArr(i,j,kk,irxn)
-                      PhotolysisRates(irxn) = PhotoArr(i,j,l,irxn) ! AD DEBUG
-                enddo
-
-
-                !write(*,*) "z level 'l':", l
-                !write(*,*) "samvalj(:,l)",samvalj(:,l)
-                !write(*,*) "PhotolysisRates going into SAM_wrapper", PhotolysisRates !AD DEBUG
-                do irxn=1,nPhoto !AD DEBUG
-!                     PhotolysisRates(irxn) = PhotoArr(i,j,kk,irxn) !AD DEBUG
-		     PhotolysisRates(irxn) = PhotoArr(i,j,l,irxn) !AD DEBUG above ... shouldn't be kk (not defined till L1180)?	
-!                      PhotolysisRates(irxn) = 0 ! AD DEBUG
-                enddo !AD DEBUG
-
+                PhotolysisRates(:) = PhotoArr(i,j,l,:)
                 ! Rates for species not in TUV (e.g. columns 49-51) are set
                 ! with their scale factors in PhotoMap.in (samasp_photo_map)
 
-		write(*,*) "PhotolysisRates passed to SAM_wrapper: ", PhotolysisRates !AD DEBUG
-		!call flush(6) !AD DEBUG
-!write(*,*) "Fire Loop L990 sum(tracer(i,j,l,:))", sum(tracer(i,j,l,:)) !MM DEBUG
-!write(*,*) "Fire Loop tracers.f90 sum(tracer) L990", sum(tracer) !MM DEBUG
-                write(*,*) "Before SAM_wrapper"
-   	        call SAM_wrapper(size(GasConc), &
-				size(GasConc), & 
-                                solar_zenith_angle, &
-                                GasConc, &
-                                temptm, &!
-				prestm, &   
-                                airdens, &
-				tstep, &
-                                AfterGasConc,  &
-                                MassConc, &!
-				NumConc, &
-				TermVel, &
-				Transmissivity,i,l,PhotolysisRates,ExtCoeff, SingScat, Assym)
-!write(*,*) "Fire Loop L1005 sum(tracer(i,j,l,:))", sum(tracer(i,j,l,:)) !MM DEBUG
-!write(*,*) "Fire Loop tracers.f90 sum(tracer) L1005", sum(tracer) !MM DEBUG
-                !write(*,*) "Fire Loop After SAM_wrapper" !AD DEBUG
-		!write(*,*) "tracers.f90 NANCHECK sum(NumConc)", sum(NumConc)
-                !write(*,*) "tracers.f90 NANCHECK sum(GasConc)", sum(GasConc)
-                !write(*,*) "tracers.f90 NANCHECK sum(AfterGasConc)", sum(AfterGasConc)
-                !write(*,*) "tracers.f90 NANCHECK sum(MassConc)", sum(MassConc)
-            !MJA 20190702 Store Aerosol Optical Properties for grid
+                if (ncell == size(cell_aird)) call grow_cell_buffers(aspin, cell_ijl, cell_aird)
+                ncell = ncell + 1
+                cell_ijl(:,ncell) = (/ i, j, l /)
+                cell_aird(ncell) = airdenstm
+                call asp_pack_in(aspin(:,ncell), solar_zenith_angle, GasConc, temptm, prestm, &
+                                 airdens, tstep, MassConc, NumConc, Transmissivity, i, l, &
+                                 PhotolysisRates)
+            END IF ! GT GasConc(2)
+         enddo
+      enddo
+   enddo
+
+   allocate(aspout(asp_nout(), max(ncell,1)))
+   call balanced_compute(dompi, asp_nin(), asp_nout(), ncell, aspin, aspout, asp_cells)
+
+   do icell = 1, ncell
+      i = cell_ijl(1,icell); j = cell_ijl(2,icell); l = cell_ijl(3,icell)
+      airdenstm = cell_aird(icell)
+      call asp_unpack_out(aspout(:,icell), AfterGasConc, MassConc, NumConc, &
+                          ExtCoeff, SingScat, Assym)
                 ! start MM DEBUG BLOCK
-                write(*,*) "tracers_physics:L1014 After SAM_wrapper" 
+                write(*,*) "tracers_physics:L1014 After SAM_wrapper"
                 !WRITE(*,*) "shape(ExtCoeff) = ", shape(ExtCoeff)
                 !WRITE(*,*) "shape(SingScat) = ", shape(SingScat)
                 !WRITE(*,*) "shape(Assym) = ", shape(Assym)
@@ -1210,10 +1207,11 @@ enddo ! nx
 !                IF (sum(tracer) .LT. 0) THEN !AD DEBUG
 !			STOP !AD DEBUG
 !		ENDIF !AD DEBUG
-            !!!! ENDING Identifed as a fire grid box so running ASP 		
-            END IF ! GT GasConc(2)
+   enddo ! icell
+   deallocate(aspin, aspout, cell_ijl, cell_aird)
 
-         enddo
+   do i=1,nx
+      do j=1,ny
       !MJA 20190702 TODO: Call TUV to get photolysis rates for each column AFTER the main z loop is done
          !Call tuv
          !samtstart = hour - 7 !Convert from PST to UTC, kludge that will need to be fixed!
@@ -1383,5 +1381,112 @@ write(*,*) "end tracers_physics loop"
         ' TUV wavelength bins match ASP optics; TUV uses ', tuv_nz, ' levels'
    tuv_checked = .true.
  end subroutine check_tuv_wavelengths
+
+!----------------------------------
+! ASP inputs and outputs of one plume cell, packed into a column of real*8
+! values so that cells can be computed on another MPI rank (samasp_balance).
+
+ integer function asp_nin()
+   asp_nin = 8 + HowManyEvolveGasChems + nBins*nSpec + nBins + nPhoto
+ end function asp_nin
+
+ integer function asp_nout()
+   asp_nout = HowManyEvolveGasChems + nBins*nSpec + nBins + 3*NFastTUVWvl
+ end function asp_nout
+
+ subroutine asp_pack_in(buf, sza, gas, temp, pres_pa, dens, tstep, mass, num, &
+                        transm, i, l, photo)
+   real*8, intent(out) :: buf(:)
+   real*8, intent(in) :: sza, gas(:), temp, pres_pa, dens, tstep, mass(:,:), &
+                         num(:), transm, photo(:)
+   integer, intent(in) :: i, l
+   integer :: k, nG
+   nG = HowManyEvolveGasChems
+   buf(1:8) = (/ sza, temp, pres_pa, dens, tstep, transm, dble(i), dble(l) /)
+   k = 8
+   buf(k+1:k+nG) = gas(1:nG)
+   k = k + nG
+   buf(k+1:k+nBins*nSpec) = reshape(mass(1:nBins,1:nSpec), (/nBins*nSpec/))
+   k = k + nBins*nSpec
+   buf(k+1:k+nBins) = num(1:nBins)
+   k = k + nBins
+   buf(k+1:k+nPhoto) = photo(1:nPhoto)
+ end subroutine asp_pack_in
+
+ subroutine asp_unpack_out(buf, gas, mass, num, ext, ssa, asym)
+   real*8, intent(in) :: buf(:)
+   real*8, intent(out) :: gas(:), mass(:,:), num(:), ext(:), ssa(:), asym(:)
+   integer :: k, nG, nW
+   nG = HowManyEvolveGasChems; nW = NFastTUVWvl
+   k = 0
+   gas(1:nG) = buf(k+1:k+nG)
+   k = k + nG
+   mass(1:nBins,1:nSpec) = reshape(buf(k+1:k+nBins*nSpec), (/nBins,nSpec/))
+   k = k + nBins*nSpec
+   num(1:nBins) = buf(k+1:k+nBins)
+   k = k + nBins
+   ext(1:nW) = buf(k+1:k+nW)
+   k = k + nW
+   ssa(1:nW) = buf(k+1:k+nW)
+   k = k + nW
+   asym(1:nW) = buf(k+1:k+nW)
+ end subroutine asp_unpack_out
+
+ ! Run ASP (SAM_wrapper) for n packed cells
+ subroutine asp_cells(nin, nout, n, in, out)
+   integer, intent(in) :: nin, nout, n
+   real*8, intent(in) :: in(nin, n)
+   real*8, intent(out) :: out(nout, n)
+   REAL*8 :: GasConc(HowManyEvolveGasChems), AfterGasConc(HowManyEvolveGasChems)
+   REAL*8 :: MassConc(nBins,nSpec), NumConc(nBins), TermVel(nBins)
+   REAL*8 :: PhotolysisRates(nPhoto)
+   REAL*8, DIMENSION(NFastTUVWvl) :: Ext, Ssa, Asym
+   real*8 :: sza, temptm, prestm, airdens, tstep, transm
+   integer :: c, k, nG, nW, i, l
+   nG = HowManyEvolveGasChems; nW = NFastTUVWvl
+   do c = 1, n
+      sza = in(1,c); temptm = in(2,c); prestm = in(3,c); airdens = in(4,c)
+      tstep = in(5,c); transm = in(6,c); i = nint(in(7,c)); l = nint(in(8,c))
+      k = 8
+      GasConc = in(k+1:k+nG,c)
+      k = k + nG
+      MassConc = reshape(in(k+1:k+nBins*nSpec,c), (/nBins,nSpec/))
+      k = k + nBins*nSpec
+      NumConc = in(k+1:k+nBins,c)
+      k = k + nBins
+      PhotolysisRates = in(k+1:k+nPhoto,c)
+      AfterGasConc = 0.0D0
+      write(*,*) "PhotolysisRates passed to SAM_wrapper: ", PhotolysisRates !AD DEBUG
+      write(*,*) "Before SAM_wrapper"
+      call SAM_wrapper(size(GasConc), size(GasConc), sza, GasConc, temptm, prestm, &
+                       airdens, tstep, AfterGasConc, MassConc, NumConc, TermVel, &
+                       transm, i, l, PhotolysisRates, Ext, Ssa, Asym)
+      k = 0
+      out(k+1:k+nG,c) = AfterGasConc
+      k = k + nG
+      out(k+1:k+nBins*nSpec,c) = reshape(MassConc, (/nBins*nSpec/))
+      k = k + nBins*nSpec
+      out(k+1:k+nBins,c) = NumConc
+      k = k + nBins
+      out(k+1:k+nW,c) = Ext
+      k = k + nW
+      out(k+1:k+nW,c) = Ssa
+      k = k + nW
+      out(k+1:k+nW,c) = Asym
+   end do
+ end subroutine asp_cells
+
+ ! Double the capacity of the plume-cell buffers of tracers_physics
+ subroutine grow_cell_buffers(aspin, cell_ijl, cell_aird)
+   real*8, allocatable, intent(inout) :: aspin(:,:), cell_aird(:)
+   integer, allocatable, intent(inout) :: cell_ijl(:,:)
+   real*8, allocatable :: a(:,:), d(:)
+   integer, allocatable :: c(:,:)
+   integer :: n
+   n = size(cell_aird)
+   allocate(a(size(aspin,1), 2*n), c(3, 2*n), d(2*n))
+   a(:,1:n) = aspin; c(:,1:n) = cell_ijl; d(1:n) = cell_aird
+   call move_alloc(a, aspin); call move_alloc(c, cell_ijl); call move_alloc(d, cell_aird)
+ end subroutine grow_cell_buffers
 
 end module tracers

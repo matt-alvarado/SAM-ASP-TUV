@@ -394,3 +394,49 @@ species in `GasPhaseChems.in`: outputs must still be labelled correctly.
 - `day0`/`day` follow SAM's CAM radiation (1.0 = 1 January 00 UTC);
   `create_run.py` writes them that way. asptest is 17 November 20 UTC again
   (TUV solar zenith angle 53.96°).
+
+**Performance (same physics and chemistry) — items 1, 3, 2**
+
+Timings are asptest (30 steps, 16 MPI ranks oversubscribed on this machine).
+
+- *Item 1, TUV fixed set-up once* (`TUV4SAMASP.f`): input file, grids,
+  spectra, cross sections and fixed optical depths were re-read and
+  recomputed on every call (every column, every step), ~90% of a non-plume
+  rank's time. Now done on the first call; per call only time, aerosol and the
+  radiative transfer. 560 s -> 233 s.
+- *TUV compiled with `-fp-model precise`* (`Makefile_SAM`): under the fast FP
+  model the item-1 change altered TUV's single-precision rounding (J-values
+  up to ~2e-5 relative; old and new code are identical under precise). With
+  precise semantics TUV's results no longer depend on how unrelated code is
+  arranged. J-values change once, relative to the fast-FP build.
+- *Item 3, DPREP ordering cache with 8 slots* (common_ASP `opkda1.f`): ASP
+  alternates between ODE systems of 5 sparsity structures; the one-slot cache
+  hit on ~81% of calls, 8 slots on 99.99%. Output byte-identical;
+  233 s -> 197 s.
+- *Item 2, ASP load balancing across MPI ranks*:
+  - Order independence (common_ASP `StepASP4SAM.f90`, option A): ASP calls
+    warm-start from the particle state of the previous call, and the
+    tabulated Gibbs-Duhem integral's range grows with the ionic strengths
+    seen, so a cell's result depended on the cells computed before it.
+    `SetASPCellReset(.TRUE.)` saves the particle state; every later
+    `ASPInterface` call restores it and resets the Gibbs-Duhem tables.
+    SAM turns this on only when `dompi` is true; it is off by default, so
+    ASP's Lagrangian parcel runs are unchanged. (This changes SAM-ASP-TUV
+    MPI results once relative to the warm-started runs.)
+  - Tests: every cell recomputed in reverse order within its rank (0
+    differences in 42 rank-steps), and every rank recomputing the next
+    rank's cells (0 differences in 10,558 cells).
+  - `SRC_TUV/samasp_balance.f90` + `tracers_physics`: the plume cells of all
+    ranks, in global order, are split into equal contiguous blocks; inputs
+    and outputs are exchanged with `MPI_Alltoallv`. `tracers_physics` now
+    (1) collects each rank's plume-cell inputs, (2) runs ASP on the balanced
+    blocks, (3) writes results back, (4) runs TUV per column (as before,
+    after that column's ASP results are stored).
+  - Result: with SAM compiled with `-fp-model=precise`, the balanced run is
+    bit-identical to the unbalanced run (all 478 bin2D fields and the stat
+    file); 170 s -> 114 s. With SAM's default (fast) FP model the two differ
+    because the restructured loop changes the compiler's rounding of the
+    water concentration (`waterconc`) by one ulp in some cells; ASP's
+    inorganic equilibrium amplifies that to up to ~60% in a few cells of
+    TotNO3/NH3/TotSO4 (most fields ~3e-6 relative). Without precise FP,
+    any edit of `tracers.f90` can do the same.
