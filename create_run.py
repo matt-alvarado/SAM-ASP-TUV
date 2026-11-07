@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Based on build_ncep.py written by Robin Stevens, Dec. 2011
 # Adapted by Chantelle Lonsdale, June 2017
@@ -251,22 +251,22 @@ def findpoint(lat,lon,time,emislat,emislon,ncephours1800,ncephours0001,NA):
    return([bestx,besty,t])
 
 def printstuff(x,y,t):
-   print 'i = '+str(x)+' j = '+str(y)
-   print str(emisdate)
-   print 't:'+str(t)
-   print 'time used:'+str(time[t])
+   print('i = '+str(x)+' j = '+str(y))
+   print(str(emisdate))
+   print('t:'+str(t))
+   print('time used:'+str(time[t]))
    return
 
 def printstuff2(x,y,t):
    if NA:
-      print 'lat = ' + str(infile.variables["lat"][y,x])
-      print 'lon = ' + str(infile.variables["lon"][y,x])
+      print('lat = ' + str(infile.variables["lat"][y,x]))
+      print('lon = ' + str(infile.variables["lon"][y,x]))
    else:
-      print 'lat = ' + str(infile.variables["lat"][y])
-      print 'lon = ' + str(infile.variables["lon"][x])
-   print str(emisdate)
-   print 't:'+str(t)
-   print 'time used'+str(time[t])
+      print('lat = ' + str(infile.variables["lat"][y]))
+      print('lon = ' + str(infile.variables["lon"][x]))
+   print(str(emisdate))
+   print('t:'+str(t))
+   print('time used'+str(time[t]))
    return
 
 def number_dist(Dpm,sigma,mass_flux,aerodens):
@@ -317,7 +317,7 @@ caseid = 1
 for lineid in range(0,1):#ncases): # here the looping begins if you have multiple days!
 
    caseidstr = '%(cid)04d' % {"cid":caseid}
-   print ' case '+caseidstr+'/%(len)3d' % {"len":len(lines)}
+   print(' case '+caseidstr+'/%(len)3d' % {"len":len(lines)})
 
    
    # unpack the parameters
@@ -356,7 +356,7 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
    startdate = datetime(input_year,input_month,input_day,input_hour,input_minute)
 
    #timepoint
-   print('startdate = ',startdate)   
+   print(('startdate = ',startdate))   
    if NA == 0 and emislon < 0.:
       emislon = emislon+360.
 
@@ -366,9 +366,9 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
    else: mnstr = str(startdate.month)
 
    nceptime1800 = startdate - datetime(1800,1,1) # timedelta object, time since 1800
-   ncephours1800 = nceptime1800.days*24+nceptime1800.seconds/3600 # time since 01/01/1800 in hours
+   ncephours1800 = nceptime1800.days*24+nceptime1800.seconds//3600 # time since 01/01/1800 in hours
    nceptime0001 = startdate - datetime(1,1,1) # timedelta object, time since year 1
-   ncephours0001 = nceptime0001.days*24+nceptime0001.seconds/3600 # time since 01/01/01 in hours
+   ncephours0001 = nceptime0001.days*24+nceptime0001.seconds//3600 # time since 01/01/01 in hours
 
    # --- download the data we need --------------------------------------
    
@@ -413,7 +413,7 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
    # --- read the data files for writing the lsf and snd files ----------
 
    # --- get air temperature data ---
-   print 'getting air temperature data...'
+   print('getting air temperature data...')
    if NA:
       infile = netCDF4.Dataset('NCEP/air.'+yrstr+mnstr+'.nc','r',format='netcdf3') # Read file using NIO
    else:
@@ -435,7 +435,7 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
    else:
       emisdate = datetime(1,1,1,0) + timedelta(hours=time[t])
    day = np.zeros(npts)
-   ofyear = emisdate - datetime(emisdate.year,01,01)
+   ofyear = emisdate - datetime(emisdate.year,1,1)
    case_year = emisdate.year # calendar year of day0 (year0 in prm)
    for i in range(npts):
       # calendar day as in SAM's CAM radiation (1.0 = 1 January 00 UTC),
@@ -454,7 +454,7 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
 
 
    # --- get the surface pressure ---
-   print 'getting surface pressure...'
+   print('getting surface pressure...')
    infile = netCDF4.Dataset('NCEP/pres.sfc.'+yrstr+'.nc','r')
 
    [lat,lon,time] = fillarrays(infile,"pres")
@@ -466,7 +466,7 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
    infile.close()
 
    # --- get planetary boundary layer height data ---
-   print 'getting bl height data...'
+   print('getting bl height data...')
    # I don't have a plan for this outside NA at the moment
    infile=netCDF4.Dataset('NCEP/hpbl.'+yrstr+'.nc','r',format='netcdf3')
 
@@ -484,7 +484,7 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
    hpblp = pres*np.exp(-hpbl/(HoverT*temp[0]))
 
    # --- get u-wind data ---
-   print 'getting u-wind data...'
+   print('getting u-wind data...')
    if NA:
       infile=netCDF4.Dataset('NCEP/uwnd.'+yrstr+mnstr+'.nc','r',format='netcdf3') 
    else:
@@ -501,7 +501,7 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
 
 
    #--- get the v-wind data ---
-   print 'getting v-wind data...'
+   print('getting v-wind data...')
    if NA:
       infile=netCDF4.Dataset('NCEP/vwnd.'+yrstr+mnstr+'.nc','r',format='netcdf3') 
    else:
@@ -540,7 +540,7 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
       vls = -uwind*np.sin(theta) + vwind*np.cos(theta)
    elif samx == 'Ay': # autofit wind y
       hpblz = np.where(level > min(hpblp,pres-50))[0][0]
-      print(hpblp,pres,min(hpblp,pres-50),level)
+      print((hpblp,pres,min(hpblp,pres-50),level))
       wspd = (uwind[hpblz]**2+vwind[hpblz]**2)
       # Weight wind direction by wind speed
       theta = ( np.arctan2(vwind[hpblz],uwind[hpblz])*wspd/wspd.mean() ).mean()
@@ -562,7 +562,7 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
    #extinputfile.close()
 
    # --- get the specific humidity ---
-   print 'getting specific humidity data...'
+   print('getting specific humidity data...')
    if NA:
       infile=netCDF4.Dataset('NCEP/shum.'+yrstr+mnstr+'.nc','r',format='netcdf3')
    else:
@@ -581,7 +581,7 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
 
 
    # --- write the snd file ---
-   print 'writing snd file...'
+   print('writing snd file...')
    #outputfile =  open('/home/ksakamoto/SAM/RUNS/'+casename +'/snd','w')
    outputfile =  open(rundir+'/RUNS/'+casename+'/snd','w')
    outputfile.write(' z[m] p[mb] tp[K] q[g/kg] u[m/s] v[m/s]\n')
@@ -593,7 +593,7 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
 
 
    # --- write the lsf file ---
-   print 'writing lsf file...'
+   print('writing lsf file...')
    outputfile =  open(rundir+'/RUNS/'+casename+'/lsf','w')
    outputfile.write(' z[m] p[mb]  tls[K/s] qls[kg/kg/s] uls  vls  wls[m/s]\n')
    for i in range(npts):
@@ -606,7 +606,7 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
    # --- read the data files for writing the sfc file -------------------
 
    # --- read the sensible heat flux ---
-   print 'reading the sensible heat flux...'
+   print('reading the sensible heat flux...')
    if NA:
       infile = netCDF4.Dataset('NCEP/shtfl.'+yrstr+'.nc','r',format='netcdf3')
    else:
@@ -620,7 +620,7 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
    infile.close()
 
    # --- read the latent heat flux ---
-   print 'reading the latent heat flux...'
+   print('reading the latent heat flux...')
    if NA:
       infile = netCDF4.Dataset('NCEP/lhtfl.'+yrstr+'.nc','r',format='netcdf3')
    else:
@@ -640,7 +640,7 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
    if NA: # timestep different from other files, so we have to muck around
 
       # --- read the u-momentum flux ---
-      print 'reading the u-momentum flux...'
+      print('reading the u-momentum flux...')
       infile = netCDF4.Dataset('NCEP/uflx.sfc.gauss.'+yrstr+'.nc','r',format='netcdf3') 
 
       [lat,lon,time] = fillarrays(infile,"uflx")
@@ -665,7 +665,7 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
       infile.close()
 
       # --- read the v-momentum flux ---
-      print 'reading the v-momentum flux...'
+      print('reading the v-momentum flux...')
       infile = netCDF4.Dataset('NCEP/vflx.sfc.gauss.'+yrstr+'.nc','r',format='netcdf3') 
 
       [lat,lon,time] = fillarrays(infile,"vflx")
@@ -694,7 +694,7 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
    else: # we are using NCEP data, timestep same as other files
 
       # --- read the u-momentum flux ---
-      print 'reading u-momentum flux...'
+      print('reading u-momentum flux...')
       infile = netCDF4.Dataset('NCEP/uflx.sfc.gauss.'+yrstr+'.nc','r',format='netcdf3') 
 
       [lat,lon,time] = fillarrays(infile,"uflx")
@@ -734,14 +734,14 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
          emisdate = datetime(1,1,1,0) + timedelta(hours=time[t])
 
       if (verbose):
-         print ' to check correct lat, lon, time in ulfx.sfc.gauss.'+yrstr+'.nc:'
+         print(' to check correct lat, lon, time in ulfx.sfc.gauss.'+yrstr+'.nc:')
          printstuff2(bestx,besty,t)
 
       uflx = infile.variables["uflx"][t,besty,bestx]  
       infile.close()
 
       # --- read the v-momentum flux ---
-      print 'reading the v-momentum flux...'
+      print('reading the v-momentum flux...')
       infile = netCDF4.Dataset('NCEP/vflx.sfc.gauss.'+yrstr+'.nc','r',format='netcdf3') 
 
       [lat,lon,time] = fillarrays(infile,"vflx")
@@ -776,7 +776,7 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
       
 
    # --- write the sfc file ---
-   print 'writing sfc file...'
+   print('writing sfc file...')
    outputfile = open(rundir+'/RUNS/'+casename+'/sfc','w')
    outputfile.write('day sst(K) H(W/m2) LE(W/m2) TAU(m2/s2)\n')
    for i in range(npts):
@@ -786,7 +786,7 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
 
 
    # --- write the prm file ---
-   print 'writing prm file...'
+   print('writing prm file...')
 
    # The casename and caseid are each limited to 40 characters.
    # I cannot fit all of the parameters in either one, so I am going
@@ -828,9 +828,9 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
       nstop = int(2*3600/dt) #int(1+nstop/nsave3D)*nsave3D
 
       if nstop > maxn:
-         print 'huge nstop, vg<'+str(maxd/(maxn*dt))+' m/s'
-         print 'setting nstop='+str(maxn)
-         print 'nstop: '+str(nstop)+' vg: '+str(vg)
+         print('huge nstop, vg<'+str(maxd/(maxn*dt))+' m/s')
+         print('setting nstop='+str(maxn))
+         print('nstop: '+str(nstop)+' vg: '+str(vg))
          nstop = maxn
 
       prmfile =  open(rundir+'/RUNS/'+casename +'/prm','w')
@@ -919,7 +919,7 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
 
 
       # --- write the grd file ---
-      print 'writing grd file...'
+      print('writing grd file...')
       outputfile =  open(rundir+'/RUNS/'+casename +'/grd','w')
       outputfile.write('20\n60\n100')
       outputfile.close()
@@ -927,7 +927,7 @@ for lineid in range(0,1):#ncases): # here the looping begins if you have multipl
       # --- copy in lst file ---
       # Maybe change this to a series of write statements later.
       # It's 188 lines, so I don't really want that all in here.
-      print 'copying in lst file...'
+      print('copying in lst file...')
       #os.system('cp lst '+rundir+'/RUNS/'+casename+'/')
       os.system('cp '+rundir+'/RUNDATA/lst '+rundir+'/RUNS/'+casename+'/') 
 

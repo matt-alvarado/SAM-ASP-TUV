@@ -369,3 +369,15 @@ species in `GasPhaseChems.in`: outputs must still be labelled correctly.
   particles per kg burned with `CO_init = 3400` ppb, while ASP's
   `GasPhaseChems.in` sets the initial plume CO to 10000 ppb.
 
+
+**Python scripts — converted to Python 3**
+- `create_run.py`, and both copies (SRC/, SRC_TUV/) of
+  `InorganicInputDecks/defaults/MappingPrelim/process_photo_rate_table.py`
+  and `_getListOfCompounds.py`. Conversion with fissix (lib2to3 fork), then
+  reviewed: whole-hour integer divisions in `create_run.py` keep `//`; mixed
+  tab/space indentation expanded as Python 2 read it (tab = 8 columns).
+- Checked: `_getListOfCompounds.py` reproduces the committed
+  `_GaseousSpeciesBlankList.in` exactly; `process_photo_rate_table.py`
+  reproduces the committed `PHOTO.DAT` line for line, with the reactions in
+  PhotoRates.in order (Python 2 used arbitrary dict order). `create_run.py`
+  compiles but was not run (it downloads NCEP data).
