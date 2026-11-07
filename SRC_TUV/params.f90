@@ -59,6 +59,9 @@ integer:: fire_k1 = 32, fire_k2 = 55
 ! ASP input-deck and output directories, relative to the run directory
 ! (each ends in '/'); passed to InitializeASP.
 character(256):: asp_deck_dir = 'SRC_TUV/ASP/InorganicInputDecks/'
+! Calendar year of the run (day0, day are days of that year); used for
+! TUV's date (Earth-Sun distance and solar declination)
+integer:: year0 = 2009
 character(256):: asp_output_dir = 'SRC_TUV/ASP/OutputFiles/'
 
 real(8):: tabs_s =0.	! surface temperature,K

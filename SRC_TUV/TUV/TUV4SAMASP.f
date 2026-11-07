@@ -37,8 +37,11 @@
 !      END PROGRAM
 
 
-      SUBROUTINE tuv4samasp(samtstart, nsamz,samAOD, samSSA, 
-     $                      samASYM, samvalj, samnj, samjlabel)
+      SUBROUTINE tuv4samasp(samtstart, samlat, samlon,
+     $                      samyear, sammonth, samday,
+     $                      nsamz, samzi, samAOD, samSSA,
+     $                      samASYM, samvalj, samnj, samjlabel,
+     $                      samnz, samnw, samwc)
 *-----------------------------------------------------------------------------*
 *=    Tropospheric Ultraviolet-Visible (TUV) radiation model                 =*
 *=    Version 5.3                                                            =*
@@ -80,7 +83,15 @@
 
 * MJA 20190616 MJA Added input/output variables to make a subroutine
       REAL*8, INTENT(IN) :: samtstart !Time (hr) in UTC
+* Site and date from SAM (latitude and longitude in degrees, east
+* positive; calendar date; samtstart is the time in hours UTC)
+      REAL*8, INTENT(IN) :: samlat, samlon
+      INTEGER, INTENT(IN) :: samyear, sammonth, samday
       INTEGER, INTENT(IN) :: nsamz ! Number of altitude layers from SAM-ASP, less than nz for TUV
+* SAM layer interfaces (km above the surface), samzi(1) = 0. TUV levels
+* 1..nsamz+1 are these interfaces, so TUV layer iz is SAM layer iz;
+* above SAM's top TUV levels are about 1 km apart up to zstop.
+      REAL*8, INTENT(IN) :: samzi(nsamz+1)
       REAL*8, INTENT(IN) :: samAOD(kz,kw), samSSA(kz,kw), samASYM(kz,kw) 
 * J-values of the selected TUV reactions, in the order they are
 * selected in the TUV input file: samvalj(ij,iz) for ij = 1..samnj,
@@ -89,6 +100,12 @@
       REAL*8, INTENT(OUT) :: samvalj(kj,kz) 
       INTEGER, INTENT(OUT) :: samnj
       CHARACTER*50, INTENT(OUT) :: samjlabel(kj)
+* TUV levels used (J-values at levels 1..samnz, samzi at the bottom) and
+* the centres (nm) of the samnw wavelength bins of the aerosol inputs
+      INTEGER, INTENT(OUT) :: samnz, samnw
+      REAL*8, INTENT(OUT) :: samwc(kw)
+      INTEGER :: nupper
+      REAL :: ztopsam, dzup
 
 * Wavelength grid:
 
@@ -493,12 +510,12 @@ c      izfix = 0
       nwint = -7
       tstart = samtstart
       nt = 1 !Only calculate one timestep
-      lat = 47.9392
-      lon = -118.6183
+      lat = REAL(samlat)
+      lon = REAL(samlon)
       tmzone = 0
-      iyear = 2019
-      imonth = 8
-      iday = 3 
+      iyear = samyear
+      imonth = sammonth
+      iday = samday
 !END MJA 20190616 FORCED INPUTS      
       
       IF(nstr .LT. 2) THEN
@@ -515,6 +532,28 @@ c      izfix = 0
 * altitudes (creates altitude grid, locates index for selected output, izout)
 
       CALL gridz(zstart, zstop, nz, z, zout, izout)
+
+* SAM-ASP: replace the altitude grid with SAM's layer interfaces,
+* then levels about 1 km apart from SAM's top up to zstop
+      ztopsam = REAL(samzi(nsamz+1))
+      nupper = MIN(kz - (nsamz+1) - 1, CEILING(zstop - ztopsam))
+      IF (nupper .LT. 10) THEN
+         WRITE(*,*) 'tuv4samasp: SAM has too many levels for TUV (kz=',
+     $        kz, ', SAM layers=', nsamz, '); increase kz in params'
+         STOP
+      ENDIF
+      dzup = (zstop - ztopsam)/FLOAT(nupper)
+      nz = nsamz + 1 + nupper
+      DO iz = 1, nsamz+1
+         z(iz) = zstart + REAL(samzi(iz))
+      ENDDO
+      DO iz = nsamz+2, nz
+         z(iz) = zstart + ztopsam + dzup*FLOAT(iz-nsamz-1)
+      ENDDO
+      izout = 1
+      DO iz = 2, nz
+         IF (ABS(z(iz)-zout) .LT. ABS(z(izout)-zout)) izout = iz
+      ENDDO
       IF(izfix .GT. 0) izout = izfix
 
 * time/zenith (creates time/zenith angle grid, starting at tstart)
@@ -750,11 +789,12 @@ c      CALL newlst(ns,slabel,nj,jlabel)
 
       !Fix top layer, at every wavelength (this used to run after the
       !iw loop had ended, i.e. with iw = kw+1, out of bounds)
+      !(the top layer is nz-1; it used to be fixed at 193)
       do iw = 1, kw
-      !dtaer(193, iw) = 0.0
-      dtaer(193, iw) = 1.0E-20 ! MM DEBUG
-      omaer(193,iw) = 1.0
-      gaer(193,iw) = 0.0
+      !dtaer(nz-1, iw) = 0.0
+      dtaer(nz-1, iw) = 1.0E-20 ! MM DEBUG
+      omaer(nz-1,iw) = 1.0
+      gaer(nz-1,iw) = 0.0
       enddo
      
       !do iz = 1, nz
@@ -1000,6 +1040,12 @@ c            dt_any(iz,iw) = 0.79*aircol(iz) * 2.e-17 ! N2 VUV absorption
     !(samasp_photo.f90, PhotoMap.in)
          samvalj(:,:) = 0.0
          samnj = nmj
+         samnz = nz
+         samnw = nw - 1
+         samwc(:) = 0.0
+         do iw = 1, nw-1
+            samwc(iw) = wc(iw)
+         enddo
          do ij = 1, nmj
             samjlabel(ij) = jlabel(imj(ij))
             do iz = 1, nz
@@ -1055,6 +1101,16 @@ c 444  format(1pe11.4,1x,a50)
 !      CLOSE(iout)
       CLOSE(kout)
       END SUBROUTINE tuv4samasp
+
+* Array sizes SAM needs for the tuv4samasp arguments (TUV's params)
+      SUBROUTINE tuv4samasp_dims(nkz, nkw, nkj)
+      IMPLICIT NONE
+      INCLUDE 'params'
+      INTEGER, INTENT(OUT) :: nkz, nkw, nkj
+      nkz = kz
+      nkw = kw
+      nkj = kj
+      END SUBROUTINE tuv4samasp_dims
 
 
 

@@ -34,18 +34,25 @@ module tracers
  real tradv(nz,0:ntracers)  ! tendency due to vertical advection 
  real trdiff(nz,0:ntracers)  ! tendency due to vertical diffusion 
  real trphys(nz,0:ntracers)  ! tendency due to physics 
- REAL*8 ExtCoeffArr(dimx1_s:dimx2_s, dimy1_s:dimy2_s, nzm, 7)
- REAL*8 SingScatArr(dimx1_s:dimx2_s, dimy1_s:dimy2_s, nzm, 7)
- REAL*8 AssymArr(dimx1_s:dimx2_s, dimy1_s:dimy2_s, nzm, 7)
+ ! Aerosol optics from ASP in the NFastTUVWvl Fast-TUV wavelength bins
+ REAL*8 ExtCoeffArr(dimx1_s:dimx2_s, dimy1_s:dimy2_s, nzm, NFastTUVWvl)
+ REAL*8 SingScatArr(dimx1_s:dimx2_s, dimy1_s:dimy2_s, nzm, NFastTUVWvl)
+ REAL*8 AssymArr(dimx1_s:dimx2_s, dimy1_s:dimy2_s, nzm, NFastTUVWvl)
  ! J-values by ASP photolysis rate column (nPhoto columns, see samasp_photo)
  REAL*8, allocatable :: PhotoArr(:,:,:,:)
 !REAL*8 :: samtstart, samAOD(nzm,7), samSSA(nzm,7), samASYM(nzm,7), samvalj(nzm,51)
 !REAL*8 :: samtstart, samAOD(nzm,7), samSSA(nzm,7), samASYM(nzm,7), samvalj(51,nzm) !AD DEBUG
 ! use same array dimensions as TUV4SAMASP
-REAL*8 :: samtstart, samAOD(200,8), samSSA(200,8), samASYM(200,8), samvalj(150,200) !MM DEBUG
+! tuv4samasp arguments, sized from TUV's params (tuv4samasp_dims: kz, kw, kj)
+integer :: tuv_kz, tuv_kw, tuv_kj, tuv_nz, tuv_nw
+REAL*8 :: samtstart
+REAL*8, allocatable :: samAOD(:,:), samSSA(:,:), samASYM(:,:), samvalj(:,:), samwc(:)
+REAL*8, allocatable :: samzi(:)      ! SAM layer interfaces (km)
+REAL*8, allocatable :: jmid(:,:)     ! TUV J-values at SAM layer mid-heights
+logical :: tuv_checked = .false.
 ! TUV's selected reactions (count and labels) and J-values mapped to ASP columns
 integer :: samnj
-character(len=50) :: samjlabel(150)
+character(len=50), allocatable :: samjlabel(:)
 REAL*8, allocatable :: jasp(:,:)
  character *20 tracername(0:ntracers)
  character *10 tracerunits(0:ntracers)
@@ -112,7 +119,7 @@ REAL*8, allocatable :: jasp(:,:)
       real*8, parameter :: vernal_equinox  = 79 ! day of year
       real*8, parameter :: earth_tilt = 23.5 ! earth's tilt (degrees)
 
-      REAL*8, DIMENSION(7):: ExtCoeff, SingScat, Assym
+      REAL*8, DIMENSION(NFastTUVWvl):: ExtCoeff, SingScat, Assym
 CONTAINS
 
 FUNCTION Find_Chem(Chem) RESULT (Index)
@@ -189,7 +196,7 @@ END FUNCTION
 		REAL*8, allocatable :: EnvMass(:,:) !(in ug/m3)
                 ! CB: Ifort complains unless these dimensions match
 		!REAL*8, DIMENSION(18) :: ExtCoeff, SingScat, Assym
-                REAL*8, DIMENSION(7):: ExtCoeff, SingScat, Assym
+                REAL*8, DIMENSION(NFastTUVWvl):: ExtCoeff, SingScat, Assym
                 REAL*8, allocatable :: SaltConc(:)
                 REAL*8, allocatable :: SaltConcEnv(:)
 		REAL*8 :: filler_value
@@ -235,6 +242,11 @@ END FUNCTION
   ExtCoeffArr = 1e-10 !AD DEBUG AOD !mja change 20210722
   SingScatArr = 0.99 !AD DEBUG SSA !mja change 20210722
   AssymArr = 0.61 !AD DEBUG ASYM !mja change 20210722
+  call tuv4samasp_dims(tuv_kz, tuv_kw, tuv_kj)
+  allocate(samAOD(tuv_kz,tuv_kw), samSSA(tuv_kz,tuv_kw), samASYM(tuv_kz,tuv_kw), &
+           samvalj(tuv_kj,tuv_kz), samwc(tuv_kw), samjlabel(tuv_kj), &
+           samzi(nzm+1), jmid(tuv_kj,nzm))
+  samzi(1:nzm+1) = zi(1:nzm+1)/1000.d0 ! km
   samAOD = 1e-10 !MM DEBUG
   samSSA = 0.99 !MM DEBUG
   samASYM = 0.61 !MM DEBUG
@@ -584,6 +596,7 @@ enddo ! nx
       integer i,j,k,l,ntr,ntrtrack,mm,iup,idown,iden,zden,aerosol_track,binnum,ASP_time,ntrtrack2,irxn,nwvn,kk
       integer :: doAerosols
       integer :: it_fire, jt_fire ! global offset of this rank's subdomain
+      integer :: tuv_month, tuv_dom ! calendar month and day of month for TUV
 
       REAL*8 :: prestm,rhtm, temptm, airdens, boxmass,  Transmissivity,np,svp,airdenstm,tstep,solar_zenith_angle,cur_dist      
       REAL*8 :: dels1,H
@@ -630,7 +643,7 @@ enddo ! nx
       tv = iday-vernal_equinox ! days since vernal equinox  
       lambda = 360*(tv/365.24)! longitude of Earth from vernal equinox
       dels = asin(sin(earth_tilt/180*pi)*sin(lambda/180*pi))
-      H = 360*((hour-12)/24.)
+      H = 360*((hour-12)/24.) + longitude0 ! local hour angle (deg), longitude east positive
       solar_zenith_angle = acos(sin(latitude0/180*pi)*sin(dels)+cos(latitude0/180*pi)*cos(dels)*cos(H/180*pi))*180/pi	
 
 
@@ -1001,7 +1014,7 @@ enddo ! nx
                 END IF
                 ! end MM DEBUG BLOCK
                   
-                do nwvn = 1,7
+                do nwvn = 1,NFastTUVWvl
                    ExtCoeffArr(i,j,l,nwvn) = ExtCoeff(nwvn) !mja 20210721
                    SingScatArr(i,j,l,nwvn) = SingScat(nwvn) !mja 20210721
                    AssymArr(i,j,l,nwvn) = Assym(nwvn) !mja 20210721
@@ -1204,9 +1217,10 @@ enddo ! nx
          !MM DEBUG: kk and nwvn loops added after samAOD, samSSA, and samASYM
          !dimensions modified to match those in TUV4SAMASP
          DO kk = 1,nzm
-           DO nwvn = 1,7
+           DO nwvn = 1,NFastTUVWvl
              !samAOD(kk,nwvn) = 1e-6 !MM DEBUG clear sky test
-             samAOD(kk,nwvn) = ExtCoeffArr(i,j,kk,nwvn)*dz/1.0e6 !In m   MJA 20220210 DEBUG
+             ! layer optical depth = extinction (1/Mm) x layer thickness (m) / 1e6
+             samAOD(kk,nwvn) = ExtCoeffArr(i,j,kk,nwvn)*(zi(kk+1)-zi(kk))/1.0e6
              !samAOD(kk,nwvn) = ExtCoeffArr(i,j,kk,nwvn)*dz !In m   MM DEBUG
              !write(*,*) "samAOD",samAOD(:,:) !AD DEBUG
              samSSA(kk,nwvn) = SingScatARR(i,j,kk,nwvn)
@@ -1238,13 +1252,25 @@ enddo ! nx
          ! end MM DEBUG BLOCK
          
          write(*,*) "Before tuv4samasp", samtstart
-         call tuv4samasp(samtstart, nzm,samAOD, samSSA, samASYM, samvalj, &
-                         samnj, samjlabel)
+         ! TUV at SAM's site, date (year0, day) and UTC time, on a height grid
+         ! whose lowest levels are SAM's layer interfaces
+         call day_to_date(year0, int(day), tuv_month, tuv_dom)
+         call tuv4samasp(samtstart, dble(latitude0), dble(longitude0), &
+                         year0, tuv_month, tuv_dom, &
+                         nzm, samzi, samAOD, samSSA, samASYM, samvalj, &
+                         samnj, samjlabel, tuv_nz, tuv_nw, samwc)
+         if (.not. tuv_checked) call check_tuv_wavelengths()
          write(*,*) "After tuv4samasp"
          ! Map TUV's J-values to ASP's photolysis columns (PhotoMap.in) and
          ! store them for the next time step
          if (.not. photo_labels_set) call samasp_photo_set_labels(samnj, samjlabel)
-         call samasp_photo_map(samnj, nzm, samvalj, jasp)
+         ! J-values at SAM layer mid-heights z(kk), interpolated linearly
+         ! between TUV levels kk and kk+1 (SAM interfaces zi(kk), zi(kk+1))
+         do kk=1,nzm
+            jmid(1:samnj,kk) = samvalj(1:samnj,kk) + (samvalj(1:samnj,kk+1)-samvalj(1:samnj,kk)) &
+                               *(z(kk)-zi(kk))/(zi(kk+1)-zi(kk))
+         enddo
+         call samasp_photo_map(samnj, nzm, jmid, jasp)
          do kk=1,nzm
             PhotoArr(i,j,kk,:) = jasp(kk,:)
          enddo !kk=1,nzm
@@ -1316,5 +1342,40 @@ write(*,*) "end tracers_physics loop"
    enddo
 
  end subroutine tracers_hbuf_init
+
+ ! Month and day of month of day-of-year doy (1 = 1 January) in year yr
+ subroutine day_to_date(yr, doy, mon, dom)
+   integer, intent(in) :: yr, doy
+   integer, intent(out) :: mon, dom
+   integer :: ml(12), d
+   ml = (/31,28,31,30,31,30,31,31,30,31,30,31/)
+   if ((mod(yr,4) == 0 .and. mod(yr,100) /= 0) .or. mod(yr,400) == 0) ml(2) = 29
+   d = doy
+   mon = 1
+   do while (mon < 12 .and. d > ml(mon))
+      d = d - ml(mon)
+      mon = mon + 1
+   end do
+   dom = d
+ end subroutine day_to_date
+
+ ! TUV's aerosol wavelength bins must be ASP's Fast-TUV optics bins
+ subroutine check_tuv_wavelengths()
+   integer :: iw
+   if (tuv_nw /= NFastTUVWvl) then
+      write(*,*) 'ERROR: TUV has ', tuv_nw, ' wavelength bins, ASP optics ', NFastTUVWvl
+      call task_abort()
+   end if
+   do iw = 1, tuv_nw
+      if (abs(samwc(iw) - FastTUVWavelengths(iw)) > 0.5d0) then
+         write(*,*) 'ERROR: TUV wavelength bin ', iw, ' is centred at ', samwc(iw), &
+              ' nm but ASP optics use ', FastTUVWavelengths(iw), ' nm'
+         call task_abort()
+      end if
+   end do
+   if (masterproc) write(*,'(a,i0,a,i0,a)') 'SAM-ASP-TUV: ', tuv_nw, &
+        ' TUV wavelength bins match ASP optics; TUV uses ', tuv_nz, ' levels'
+   tuv_checked = .true.
+ end subroutine check_tuv_wavelengths
 
 end module tracers

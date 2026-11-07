@@ -1,9 +1,9 @@
 ! asptest: short test of the SAM-ASP-TUV coupling, derived from tuvtest.
 ! Fire emissions start at step 0 (fire_nstep_start) and last
 ! 2*(plume_y-dy)/vg/dt = 10 steps; ASP is called from step 11 where
-! CO > 130 ppb. day0 is 16 UTC so that both SAM's solar zenith angle
-! (computed as if at lon 0) and TUV, whose site is hard-coded in
-! TUV4SAMASP.f (47.94 N, 118.62 W, 3 Aug 2019), are in daylight.
+! CO > 130 ppb. day0 is 20 UTC, about local noon at the site
+! (latitude0, longitude0; year0 = 2009, day 321 = 17 November), which SAM
+! and TUV both use, so photolysis is active.
 ! 3D output every 10 steps; run stops at step 30.
  &MICRO_M2005 
  doicemicro = .false.
@@ -45,7 +45,7 @@
  dy = 500.,
  dt = 10.0,
 
- day0= 321.6667,
+ day0= 321.8333,
 
  nstop = 30,
  nrestart_skip = 30,
