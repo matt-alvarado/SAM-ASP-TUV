@@ -11,3 +11,8 @@
 /MICRO_RAD_OPTIONS.new
 /_run_asptest/
 __pycache__/
+# In-place ASP build outputs (SRC_TUV/ASP/Makefile without ASP_BUILD_DIR)
+/SRC_TUV/ASP/ObjectFiles/
+/SRC_TUV/ASP/ModuleFiles/
+/SRC_TUV/ASP/libAspLibrary.a
+/SRC_TUV/ASP/asp_v2.1.1_linux_ifort_dbl

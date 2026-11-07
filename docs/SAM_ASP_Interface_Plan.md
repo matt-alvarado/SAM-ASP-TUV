@@ -300,9 +300,10 @@ species in `GasPhaseChems.in`: outputs must still be labelled correctly.
   ErrMsg/WrtBad/WrtDim/TstBad/D1MACH in rtrans.f are renamed (ErrMsT, …,
   D1MACT; same length, so fixed-form columns are unchanged) so they do not
   clash with common_ASP's at link time.
-- The prebuilt ifort binaries still committed under SRC_TUV/ASP
-  (libAspLibrary.a, ObjectFiles/, ModuleFiles/) and the old copy under
-  SRC/ASP are from the previous bundled ASP and are now stale.
+- The stale prebuilt ifort ASP files (SRC_TUV/ASP libAspLibrary.a,
+  ObjectFiles/, ModuleFiles/, asp_v2.1.1_linux_ifort_dbl, and the root
+  libAspLibrary.a link) and the old ASP copy under SRC/ASP have been removed.
+  The ASP Makefile creates ObjectFiles/ and ModuleFiles/ when it builds.
 
 **Question 3 (derived J-values 49–51) — answered**
 - Intended: 49 = 0.33·J(C2H5CHO) (butanal's first channel and 22 other

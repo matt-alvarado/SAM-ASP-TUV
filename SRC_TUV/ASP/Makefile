@@ -22,6 +22,8 @@ PRNTDIR = $(ASP_DIR)/OUTPUT/
 INCDIR  = $(ASP_DIR)/INCLUDE/
 EXEDIR  = $(ASP_DIR)
 MODULES_OUTPUT_DIR = $(ASP_BUILD_DIR)/ModuleFiles/
+# Create the object and module directories (they are not kept in git)
+$(shell mkdir -p $(ASP_BUILD_DIR)/ModuleFiles $(ASP_BUILD_DIR)/ObjectFiles)
 
 # ASP source: the common_ASP submodule at src/ by default
 ASP_SRC_DIR ?= $(ASP_DIR)/src

@@ -1,9 +1,0 @@
-The formula for wet removal ratio within clouds can be given by Equations
-95, 96 and 96a of the HYSPLIT paper.  However, if the dogas flag is on (
-this gets turned on if any of the particle diameter/density/shape parameters
-are zero) this value gets automatically set to 0.
-
-For now, let's avoid this.
-
-Type: Float (real)
-Default: 0.0
