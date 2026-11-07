@@ -1,0 +1,81 @@
+! asptest: short test of the SAM-ASP-TUV coupling, derived from tuvtest.
+! Fire emissions start at step 0 (fire_nstep_start) and last
+! 2*(plume_y-dy)/vg/dt = 10 steps; ASP is called from step 11 where
+! CO > 130 ppb. day0 is 08 UTC so that both SAM's solar zenith angle
+! (lon 0) and TUV's fixed site in INPUTS/samasp (120.2 E) are in daylight.
+! 3D output every 10 steps; run stops at step 30.
+ &MICRO_M2005 
+ doicemicro = .false.
+
+ &PARAMETERS 
+ nrestart = 0,
+ caseid = 'asptest',
+
+ CEM = .true.,
+ LAND = .true.,
+ OCEAN = .false.,
+
+ dosgs        = .true.,
+ dodamping    = .true.,
+ doupperbound = .false.,
+ docloud      = .true.,
+ doprecip     = .false., 
+ dolongwave   = .false.,
+ doshortwave  = .false.,
+ dosurface    = .true.,
+ dolargescale = .true.,
+ doradforcing = .false.,
+ dotracers    = .true.,
+ dosfcforcing = .true.,
+ docoriolis   = .true.,
+ donudging_uv = .true.,
+ donudging_tq = .true.,
+ tauls        = 3600.,
+
+ SFC_FLX_FXD    = .true.,
+ SFC_TAU_FXD    = .true.,
+
+ latitude0 = 34.69583,
+ longitude0 = -120.2064,
+
+ fcor = 0.376e-4,
+
+ dx = 500.,
+ dy = 500.,
+ dt = 10.0,
+
+ day0= 321.3333,
+
+ nstop = 30,
+ nrestart_skip = 30,
+ nprint = 5,
+ nstat = 10,
+ nstatfrq = 5,
+
+ doSAMconditionals = .false.
+ dosatupdnconditionals = .false.
+
+ nsave2D      = 20,
+ nsave2Dstart	= 99999999,
+ nsave2Dend   = 999164000,
+ save2Dbin    = .true.
+
+ nsave3D      = 10,
+ nsave3Dstart	= 10,
+ nsave3Dend   = 999999999,
+ save3Dbin    = .true.
+
+ nstatmom      = 20
+ nstatmomstart = 9999999
+ nstatmomend   = 99960480
+ savemombin    = .true.
+
+ perturb_type = 5, 
+
+ dotracerperiodic = .true.,
+
+ massemis = 3e-05,
+ vg =  2.0, 
+ plume_y = 600.,
+ fire_nstep_start = 0,
+ /

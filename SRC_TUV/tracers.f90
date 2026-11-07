@@ -628,6 +628,7 @@ enddo ! nx
 
       integer i,j,k,l,ntr,ntrtrack,mm,iup,idown,iden,zden,aerosol_track,binnum,ASP_time,ntrtrack2,irxn,nwvn,kk
       integer :: doAerosols
+      integer :: it_fire, jt_fire ! global offset of this rank's subdomain
 
       REAL*8 :: prestm,rhtm, temptm, airdens, boxmass,  Transmissivity,np,svp,airdenstm,tstep,solar_zenith_angle,cur_dist      
       REAL*8 :: dels1,H
@@ -680,7 +681,7 @@ enddo ! nx
 
       !cur_dist = 100-((plume_y-dy)/vg/dt)
       !cur_dist = 100+(((plume_y-dy)/vg/dt)*2)
-      cur_dist = (((plume_y-dy)/vg/dt)*2)+1080
+      cur_dist = (((plume_y-dy)/vg/dt)*2)+fire_nstep_start
       !write(*,*)'In Tracer Physics:solar cur_dist = ',cur_dist
       !if (cur_dist.lt.plume_y-dy) then
 
@@ -691,12 +692,15 @@ enddo ! nx
          !write(*,*) 'cur_dist = ',cur_dist,' plume_y = ',plume_y,nstep
          !write(*,*) 'rank L681 tracers_physics= ',rank !AD DEBUG
 !AD DEBUG remove rank criterion as this seems to stay at 0?
-      if (rank.eq.7) then !AD DEBUG
-         if (nstep.gt.1080.and.nstep.le.cur_dist) then
+      ! fire_i1..fire_i2 are global x indices; each rank adds emissions to
+      ! the part of that range it owns (local i = global i - it_fire).
+      call task_rank_to_index(rank,it_fire,jt_fire)
+      if (fire_i2-it_fire.ge.1 .and. fire_i1-it_fire.le.nx) then
+         if (nstep.gt.fire_nstep_start.and.nstep.le.cur_dist) then
          !if (rank.eq.5) then! only read in plume in the first slab of the 12 x-subdomains)
 	    !do iden = 100,101
-	    do iden = 100,115
-		do zden = 32,55
+	    do iden = max(1,fire_i1-it_fire), min(nx,fire_i2-it_fire)
+		do zden = fire_k1, fire_k2
 		     prestm = dble(pres(zden)*100.d0) +p(iden,emisgridy,zden)! in Pa  
 	             temptm = dble(tabs(iden,emisgridy,zden)) ! in K
 

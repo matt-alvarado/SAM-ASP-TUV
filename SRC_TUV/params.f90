@@ -49,6 +49,13 @@ real:: nxco2 = 1         ! factor to modify co2 concentration
 logical:: doradlat = .false.
 logical:: doradlon = .false.
 real:: massemis = 0. ! mass emission flux of biomass burning - CRL 
+! Fire emission timing and location (tracers_physics). Emissions are added
+! on steps fire_nstep_start+1 .. fire_nstep_start + 2*(plume_y-dy)/vg/dt,
+! in the box of GLOBAL x indices fire_i1..fire_i2 and levels fire_k1..fire_k2
+! (at y index 1). ASP is called after that, where CO exceeds 130 ppb.
+integer:: fire_nstep_start = 1080
+integer:: fire_i1 = 100, fire_i2 = 115
+integer:: fire_k1 = 32, fire_k2 = 55
 
 real(8):: tabs_s =0.	! surface temperature,K
 real:: delta_sst = 0.   ! amplitude of sin-pattern of sst about tabs_s (ocean_type=1)
