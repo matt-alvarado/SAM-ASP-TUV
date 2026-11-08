@@ -281,10 +281,11 @@ species in `GasPhaseChems.in`: outputs must still be labelled correctly.
 
 
 **Phase 6 (common_ASP as a submodule) — done (decisions: 1a, 2a, 3a)**
-- `SRC_TUV/ASP/src` is now the common_ASP submodule, on branch
-  `claude/sam-asp-hardcoded-links-pstj1y` of common_ASP, which is
-  `asp_v2.2.2` plus the SAM-ASP-TUV changes. Repoint the submodule to
-  `asp_v2.2.2` once that branch is merged there.
+- `SRC_TUV/ASP/src` is now the common_ASP submodule, on branch `asp_v2.2.2`
+  of common_ASP. The SAM-ASP-TUV changes were developed on common_ASP branch
+  `claude/sam-asp-hardcoded-links-pstj1y` and fast-forwarded into
+  `asp_v2.2.2` (at `bf6da0b`); the ASP model repository's `asp_v2.2.2`
+  pins the same common_ASP commit.
   After cloning SAM-ASP-TUV: `git submodule update --init`.
 - Moved into common_ASP: the SAM-ASP-TUV interface (`StepASP4SAM.f90`:
   photolysis rates from TUV, 7-bin Fast-TUV aerosol optics, M3_TO_CM3 = 1e6),

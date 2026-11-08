@@ -1,4 +1,4 @@
 [submodule "SRC_TUV/ASP/src"]
 	path = SRC_TUV/ASP/src
 	url = https://github.com/matt-alvarado/common_ASP
-	branch = claude/sam-asp-hardcoded-links-pstj1y
+	branch = asp_v2.2.2
