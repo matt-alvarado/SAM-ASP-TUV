@@ -445,3 +445,15 @@ Timings are asptest (30 steps, 16 MPI ranks oversubscribed on this machine).
   for the reason above. Changes SAM's results once at the rounding level;
   ~3% slower. asptest from the repository build: 117 s, output identical to
   the verified precise balanced run.
+- *Statistics lookup and tracer initialisation* (`hbuffer.f90`,
+  `tracers_init`): `hbuf_put` scanned all 9168 statistics names on each
+  call (1.9 s per statistics call, ~25% of asptest); a hash index makes it
+  0.02 s. The start-up duplicate-name check (all pairs, ~2.5 s) and the
+  per-cell recomputation of per-bin values in `tracers_init` (~1 s) are
+  gone. Output bit-identical; asptest 117 s -> 78 s; start-up to the end of
+  initialisation 6.4 s -> 2.9 s.
+- Overall, asptest against the pre-submodule baseline (`2ecba69`, same
+  machine and compilers): 579 s -> 78 s, about 7.4 times faster.
+- Found, not fixed: the ASP gas tracer `MCR` (methacrolein) has the same
+  name as SAM's statistic `MCR` (core mass flux, `RUNDATA/lst`), so both
+  stat-file profiles named `MCR` hold the sum of the two quantities.
