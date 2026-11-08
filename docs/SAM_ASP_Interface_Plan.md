@@ -454,6 +454,11 @@ Timings are asptest (30 steps, 16 MPI ranks oversubscribed on this machine).
   initialisation 6.4 s -> 2.9 s.
 - Overall, asptest against the pre-submodule baseline (`2ecba69`, same
   machine and compilers): 579 s -> 78 s, about 7.4 times faster.
-- Found, not fixed: the ASP gas tracer `MCR` (methacrolein) has the same
-  name as SAM's statistic `MCR` (core mass flux, `RUNDATA/lst`), so both
-  stat-file profiles named `MCR` hold the sum of the two quantities.
+- Statistics name clash fixed: the ASP gas tracer `MCR` (methacrolein) had
+  the same name as SAM's statistic `MCR` (core mass flux), so both
+  stat-file profiles named `MCR` held the sum of the two quantities (since
+  the first commit). SAM's statistic is now `MCRCORE` (`RUNDATA/lst`, the
+  `RUNS/*/lst` copies, `statistics.f90`), and a duplicate statistics name now
+  stops the run at start-up with a message (`hbuffer.f90`) instead of only
+  printing a warning. asptest: 3D output identical; in the stat file only
+  that entry's name changes (no cloud cores there, so its values were zero).

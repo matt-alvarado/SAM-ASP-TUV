@@ -237,8 +237,14 @@ do n = 1,count-1
  end do
 end do
 
-! Halt simulation if duplicate entries appear in namelist.
-!if(duplicate_entries) call task_abort() !-CRL
+! Halt if a name appears twice: hbuf_put/hbuf_avg_put would add each value
+! to every entry of that name, mixing the two quantities.
+if(duplicate_entries) then
+   if(masterproc) print*,'Error: duplicate names in the statistics list (see above). '// &
+        'Rename the statistic in RUNDATA/lst and the hbuf_put call that fills it, '// &
+        'or the tracer.'
+   call task_abort()
+end if
 
 if(masterproc) then
          print *,'Number of statistics profiles:', hbuf_length

@@ -1048,7 +1048,7 @@ real, dimension(nzm) :: rhowcl, rhowmsecl, rhowtlcl, rhowqtcl,  &
 	call hbuf_put('MCRUP',prof1,factor_xy)
 	call hbuf_put('MCRDNS',prof2,factor_xy)
 	call hbuf_put('MCRDNU',prof3,factor_xy)
-	call hbuf_put('MCR',prof4,factor_xy)
+	call hbuf_put('MCRCORE',prof4,factor_xy)
 
 !---------------------------------------------------------
 !  Radiation and other stuff

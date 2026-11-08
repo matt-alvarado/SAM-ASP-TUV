@@ -151,7 +151,7 @@
 1  0 'MCRUP'	'Updraft core mass flux','kg/m2/s' 
 1  0 'MCRDNS'	'Downdraft cloud core mass flux','kg/m2/s' 
 1  0 'MCRDNU'	'Downdraft unsaturated core mass flux','kg/m2/s' 
-1  0 'MCR'	'Core mass flux','kg/m2/s' 
+1  0 'MCRCORE'	'Core mass flux','kg/m2/s' 
 1  0 'QVTEND'	'Large-Scale Vertical Advection Moisture Tendency','g/kg/day'
 1  0 'QHTEND'	'Large-Scale Horizontal Advection Moisture Tendency','g/kg/day'
 1  0 'QNUDGE'	'Large-Scale Moisture Nudging','g/kg/day'
