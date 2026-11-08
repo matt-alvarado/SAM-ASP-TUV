@@ -15,7 +15,57 @@ implicit none
 	integer status(HBUF_MAX_LENGTH)
 	integer average_type(HBUF_MAX_LENGTH)
 
+	! Name -> entry index (hash table with chaining), built at the end of
+	! hbuf_init. hbuf_put/hbuf_avg_put used to scan all hbuf_length names
+	! on every call (O(hbuf_length) per call; with ~1500 ASP tracers about
+	! 9000 names and 9000 calls per statistics step).
+	integer :: hb_nbuck = 0
+	integer, allocatable :: hb_head(:), hb_next(:)
+
 CONTAINS
+
+!------------------------------------------------------------
+
+! Bucket of a statistics name; names equal up to trailing blanks (as in
+! Fortran character comparison) get the same bucket.
+integer function hb_hash(name)
+implicit none
+character(*) name
+integer(8) h
+integer i
+h = 0
+do i = 1, len_trim(name)
+   h = mod(h*131_8 + ichar(name(i:i)), 2147483647_8)
+end do
+hb_hash = int(mod(h, int(hb_nbuck,8))) + 1
+end function hb_hash
+
+!------------------------------------------------------------
+
+! Build the index over namelist(1:hbuf_length). Each bucket's chain is in
+! increasing entry order, so lookups visit matching entries in the same
+! order as the former linear scan.
+subroutine hb_build_index(dup)
+implicit none
+logical, intent(out) :: dup
+integer l, b, m
+hb_nbuck = 2*max(hbuf_length,1) + 1
+if (allocated(hb_head)) deallocate(hb_head, hb_next)
+allocate(hb_head(hb_nbuck), hb_next(max(hbuf_length,1)))
+hb_head = 0
+hb_next = 0
+dup = .false.
+do l = hbuf_length, 1, -1
+   b = hb_hash(namelist(l))
+   m = hb_head(b)
+   do while (m > 0)
+      if (namelist(m) == namelist(l)) dup = .true.
+      m = hb_next(m)
+   end do
+   hb_next(l) = hb_head(b)
+   hb_head(b) = l
+end do
+end subroutine hb_build_index
 
 !------------------------------------------------------------
 
@@ -52,7 +102,8 @@ integer l, begin, k
 logical flag
 
 flag=.false.
-do  l = 1,hbuf_length
+l = hb_head(hb_hash(name))
+do while (l > 0)
   if(.not.(lgt(name,namelist(l)).or.llt(name,namelist(l)))) then
      flag=.true.
      if(status(l).gt.0) then
@@ -64,6 +115,7 @@ do  l = 1,hbuf_length
          end do
      endif
   endif
+  l = hb_next(l)
 end do
 if(.not.flag.and.masterproc) print*,name
 
@@ -225,17 +277,22 @@ if(dosgs) call hbuf_sgs_init(namelist,deflist,unitlist,status,average_type,count
 hbuf_length = hbuf_length+trcount
 
 ! check if there are dublicate entries in the stat list:
-duplicate_entries = .false.
+! Index the names, and report every pair n < m of equal names (in the
+! order of the former all-pairs loop) by searching only n's bucket.
+call hb_build_index(duplicate_entries)
+if (duplicate_entries) then
 do n = 1,count-1
- do m = n+1,count
+ m = hb_next(n)
+ do while (m > 0)
   if (trim(namelist(n)).eq.trim(namelist(m))) then
-   duplicate_entries=.true.
    if(masterproc) then
     print*,'Error: Multiple definition of '//namelist(n)// ' variable in stat list'
    end if
   end if
+  m = hb_next(m)
  end do
 end do
+end if
 
 ! Halt simulation if duplicate entries appear in namelist.
 !if(duplicate_entries) call task_abort() !-CRL
@@ -283,7 +340,8 @@ integer l, begin, k
 logical flag
 
 flag=.false.
-do  l = 1,hbuf_length
+l = hb_head(hb_hash(name))
+do while (l > 0)
    if(.not.(lgt(name,namelist(l)).or.llt(name,namelist(l)))) then
        flag=.true.
        if(status(l).gt.0) then
@@ -294,6 +352,7 @@ do  l = 1,hbuf_length
           end do
        endif
    endif
+   l = hb_next(l)
 end do
 if(.not.flag.and.masterproc) print*,'name ', name,' is missing in "lst" file.'
 

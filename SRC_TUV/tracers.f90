@@ -200,6 +200,8 @@ END FUNCTION
                 REAL*8, DIMENSION(NFastTUVWvl):: ExtCoeff, SingScat, Assym
                 REAL*8, allocatable :: SaltConc(:)
                 REAL*8, allocatable :: SaltConcEnv(:)
+                REAL*8, allocatable :: SaltConcBin(:,:) ! per bin, for the cell loop
+                integer :: iNH3aq
 		REAL*8 :: filler_value
 	 	integer :: doAerosols
                 real*8 :: CO_init ! initial plume CO (ppb), from ASP's GasPhaseChems.in
@@ -459,6 +461,20 @@ enddo ! binnum
 
 endif ! do aerosols
 
+! Values that are the same for every cell, computed once: the hypothetical
+! electrolyte concentrations of each emitted particle (bin) and the index
+! of aqueous NH3.
+allocate(SaltConcBin(HowManyAqChems, nBins))
+cur => particles%first
+B = 1
+DO WHILE(associated(cur))
+   SaltConcBin(:,B) = HypotheticalElectrolyteConcentrations (cur)
+   B = B + 1
+   cur => cur%next
+ENDDO
+if (HowManyAqChems >= 2) iNH3aq = findchem('NH3', 1)
+if (masterproc) write(*,*) 'Initializing Aerosols from ASP to SAM'
+
 do i=1,nx
    do j=1,ny
       do l=1,nzm
@@ -498,13 +514,11 @@ do i=1,nx
 
             cur => particles%first
             env => boundaryparticles%first
-            write(*,*)'Initializing Aerosols from ASP to SAM'
-            write(*,*)'CO_conc =',CO_conc
 
             B = 1
 
             DO WHILE(associated(cur))
-               SaltConc = HypotheticalElectrolyteConcentrations (cur)
+               SaltConc = SaltConcBin(:,B)
                !SaltConcEnv =  HypotheticalElectrolyteConcentrations (env)
 
                part_conc = GasPhaseEmisFactor(iCOg)*cur%numberofparticles/CO_conc ! #/kg_burned
@@ -516,7 +530,7 @@ do i=1,nx
 
                ! AqChems
                DO PART = 2, HowManyAqChems
-                  if (PART .EQ. findchem('NH3', 1)) then
+                  if (PART .EQ. iNH3aq) then
                      tracer(i,j,l,ntrtrack) = (env%AqChems(PART))*(env%numberofparticles*AqMolecularMass(PART))/(Mgas/Av*airmw)	! convert mol/cm3 to kg/kg_air
                      tracerfire(i,j,l,ntrtrack) = (cur%AqChems(PART))*AqMolecularMass(PART)*part_conc*massemis*boxarea*dt*g_to_kg/boxmass	
                   else
@@ -566,6 +580,7 @@ do i=1,nx
       enddo ! nz
    enddo ! ny
 enddo ! nx
+deallocate(SaltConcBin)
 
 
    if(dotracerperiodic) then
