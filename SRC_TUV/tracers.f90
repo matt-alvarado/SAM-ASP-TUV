@@ -657,6 +657,11 @@ deallocate(SaltConcBin)
       ! plume cells of this rank, their ASP inputs and outputs
       integer :: ncell, icell
       integer, allocatable :: cell_ijl(:,:)
+      ! distinct TUV column inputs of this step and their photolysis rates
+      integer :: ntuv_cache, icache, ihit
+      integer(8), allocatable, save :: tuv_cache_key(:,:)
+      real*8, allocatable, save :: tuv_cache_j(:,:,:)
+      integer(8), allocatable, save :: tuv_key_now(:)
       real*8, allocatable :: aspin(:,:), aspout(:,:), cell_aird(:)
       ! ---------------------- end from ASP
 
@@ -1046,20 +1051,7 @@ deallocate(SaltConcBin)
                 !WRITE(*,*) "shape(ExtCoeffArr) = ", shape(ExtCoeffArr)
                 !WRITE(*,*) "shape(SingScatArr) = ", shape(SingScatArr)
                 !WRITE(*,*) "shape(AssymArr) = ", shape(AssymArr)
-                IF ( ANY( ExtCoeffArr <= 0) ) then
-                   WRITE(*,*) "ExtCoeffArr has a bad value <= 0"
-                   WRITE(*,*) "ExtCoeffArr = ", ExtCoeffArr
-                END IF
-                
-                IF ( ANY( SingScatArr < 0) .OR. ANY(SingScatArr > 1.0)) then
-                   WRITE(*,*) "SingScatArr has a bad value < 0 OR > 1.0"
-                   WRITE(*,*) "SingScatArr = ", SingScatArr
-                END IF
-                
-                IF ( ANY( AssymArr < -1.0) .OR. ANY(AssymArr > 1.0)) then
-                   WRITE(*,*) "AssymArr has a bad value < -1.0 OR > 1.0"
-                   WRITE(*,*) "AssymArr = ", AssymArr
-                END IF
+                ! (checks of the whole optics arrays: once per step, after this loop)
                 ! end MM DEBUG BLOCK
                 
                 !write(*,*) "Fire Loop After Store Aerosol Optical Properties" !AD DEBUG
@@ -1230,6 +1222,28 @@ deallocate(SaltConcBin)
    enddo ! icell
    deallocate(aspin, aspout, cell_ijl, cell_aird)
 
+   ! Whole optics arrays checked once per step (they were checked after every
+   ! plume cell, i.e. (cells x array size) work; each cell's own values are
+   ! checked above as it is stored)
+   IF ( ANY( ExtCoeffArr <= 0) ) then
+      WRITE(*,*) "ExtCoeffArr has a bad value <= 0"
+      WRITE(*,*) "ExtCoeffArr = ", ExtCoeffArr
+   END IF
+   IF ( ANY( SingScatArr < 0) .OR. ANY(SingScatArr > 1.0)) then
+      WRITE(*,*) "SingScatArr has a bad value < 0 OR > 1.0"
+      WRITE(*,*) "SingScatArr = ", SingScatArr
+   END IF
+   IF ( ANY( AssymArr < -1.0) .OR. ANY(AssymArr > 1.0)) then
+      WRITE(*,*) "AssymArr has a bad value < -1.0 OR > 1.0"
+      WRITE(*,*) "AssymArr = ", AssymArr
+   END IF
+
+   ! TUV: every column has the same site, time and grid, so a column's J-values
+   ! depend only on its aerosol optics. A column whose optics are bit-identical
+   ! to those of a column already computed this step (e.g. all columns outside
+   ! the plume) reuses that column's photolysis rates.
+   ntuv_cache = 0
+
    do i=1,nx
       do j=1,ny
       !MJA 20190702 TODO: Call TUV to get photolysis rates for each column AFTER the main z loop is done
@@ -1273,6 +1287,20 @@ deallocate(SaltConcBin)
          !END IF
          ! end MM DEBUG BLOCK
          
+         call tuv_key(samAOD, samSSA, samASYM, nzm, NFastTUVWvl, tuv_key_now)
+         ihit = 0
+         do icache = 1, ntuv_cache
+            if (all(tuv_cache_key(:,icache) == tuv_key_now)) then
+               ihit = icache
+               exit
+            end if
+         end do
+         if (ihit > 0) then
+            do kk=1,nzm
+               PhotoArr(i,j,kk,:) = tuv_cache_j(kk,:,ihit)
+            enddo
+            cycle
+         end if
          if (samasp_verbose) write(*,*) "Before tuv4samasp", samtstart
          ! TUV at SAM's site, date (year0, day) and UTC time, on a height grid
          ! whose lowest levels are SAM's layer interfaces
@@ -1298,6 +1326,11 @@ deallocate(SaltConcBin)
          do kk=1,nzm
             PhotoArr(i,j,kk,:) = jasp(kk,:)
          enddo !kk=1,nzm
+         if (.not. allocated(tuv_cache_key)) &
+            allocate(tuv_cache_key(size(tuv_key_now), nx*ny), tuv_cache_j(nzm, nPhoto, nx*ny))
+         ntuv_cache = ntuv_cache + 1
+         tuv_cache_key(:,ntuv_cache) = tuv_key_now
+         tuv_cache_j(:,:,ntuv_cache) = jasp(1:nzm,:)
          if (samasp_verbose) write(*,*) "After store PhotolysisRates"
       enddo
    enddo ! end grid loop
@@ -1509,5 +1542,18 @@ if (samasp_verbose) write(*,*) "end tracers_physics loop"
    a(:,1:n) = aspin; c(:,1:n) = cell_ijl; d(1:n) = cell_aird
    call move_alloc(a, aspin); call move_alloc(c, cell_ijl); call move_alloc(d, cell_aird)
  end subroutine grow_cell_buffers
+
+ ! Bit pattern of a column's TUV aerosol optics (layers 1..nz, bins 1..nw)
+ subroutine tuv_key(aod, ssa, asym, nz, nw, key)
+   real*8, intent(in) :: aod(:,:), ssa(:,:), asym(:,:)
+   integer, intent(in) :: nz, nw
+   integer(8), allocatable, intent(inout) :: key(:)
+   integer :: n
+   n = nz*nw
+   if (.not. allocated(key)) allocate(key(3*n))
+   key(1:n)       = transfer(reshape(aod(1:nz,1:nw),  (/n/)), 0_8, n)
+   key(n+1:2*n)   = transfer(reshape(ssa(1:nz,1:nw),  (/n/)), 0_8, n)
+   key(2*n+1:3*n) = transfer(reshape(asym(1:nz,1:nw), (/n/)), 0_8, n)
+ end subroutine tuv_key
 
 end module tracers

@@ -472,8 +472,15 @@ Timings are asptest (30 steps, 16 MPI ranks oversubscribed on this machine).
   Williams, Otavi, Alaska, Timbavati (baseline mechanism) and
   Williams_CRACMM3 (all 108 numerical output files each) and on asptest
   (bit-identical); asptest 66 s -> 54 s.
+- *TUV column reuse and once-per-step optics checks* (`tracers_physics`):
+  every column has the same site, time and grid, so a column whose aerosol
+  optics are bit-identical to an already computed column of the same step
+  (all columns outside the plume) reuses its photolysis rates instead of
+  calling TUV; the whole-array bad-value checks of the optics arrays run once
+  per step instead of after every plume cell. Output bit-identical; asptest
+  54 s -> 52 s (TUV was ~9% of CPU, ~3 s of wall time here).
 - Overall, asptest against the pre-submodule baseline (`2ecba69`, same
-  machine and compilers): 579 s -> 54 s, about 10.7 times faster.
+  machine and compilers): 579 s -> 52 s, about 11 times faster.
 - Statistics name clash fixed: the ASP gas tracer `MCR` (methacrolein) had
   the same name as SAM's statistic `MCR` (core mass flux), so both
   stat-file profiles named `MCR` held the sum of the two quantities (since
