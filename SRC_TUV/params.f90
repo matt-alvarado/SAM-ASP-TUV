@@ -65,6 +65,10 @@ integer:: year0 = 2009
 ! ASP (chemistry, aerosol) is run only where CO exceeds this (ppb), i.e. in
 ! the plume, after the fire emissions have stopped
 real:: asp_co_threshold_ppb = 130.
+! Print progress and diagnostic messages from tracers_physics, TUV and ASP
+! on every call (every cell, column or wavelength). Off by default: they made
+! tens of MB of log per short run and cost several percent of the run time.
+logical:: samasp_verbose = .false.
 character(256):: asp_output_dir = 'SRC_TUV/ASP/OutputFiles/'
 
 real(8):: tabs_s =0.	! surface temperature,K

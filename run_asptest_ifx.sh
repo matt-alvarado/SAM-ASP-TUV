@@ -29,6 +29,12 @@ mpirun.openmpi --allow-run-as-root --oversubscribe -np 16 ./$EXE > run.out 2>&1
 rc=$?
 set -e
 echo "exit code $rc (9 = finished normally); log: $RUN/run.out"
-echo "ASP calls: $(grep -a -c 'After SAM_wrapper' run.out)," \
+# ASP calls are counted from a per-call message printed only with the
+# namelist option samasp_verbose = .true.
+nasp=$(grep -a -c 'After SAM_wrapper' run.out)
+[ "$nasp" -gt 0 ] || nasp="(set samasp_verbose to count)"
+echo "ASP calls: $nasp," \
      "last step: $(grep -a 'NSTEP =' run.out | tail -1 | awk '{print $3}')," \
-     "Fortran runtime errors: $(grep -a -c forrtl run.out)"
+     "Fortran runtime errors: $(grep -a -c forrtl run.out)" \
+     "(a 'process killed (SIGTERM)' at the very end is Open MPI stopping the" \
+     "other ranks after SAM's normal exit code 9)"

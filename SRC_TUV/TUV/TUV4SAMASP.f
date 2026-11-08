@@ -219,6 +219,8 @@
 * number of radiation streams
 
       INTEGER nstr
+      LOGICAL lsamvb
+      COMMON /samvrb/ lsamvb
 
 * input/output control
 
@@ -903,7 +905,9 @@ c            dt_any(iz,iw) = 0.79*aircol(iz) * 2.e-17 ! N2 VUV absorption
          zen = sza(it)
 
          WRITE(*,200) it, zen, esfact(it)
+      IF (lsamvb) THEN
          WRITE(kout,200) it, zen, esfact(it)
+      ENDIF
  200     FORMAT('step = ', I4,' sza = ', F9.3, 
      $        ' Earth-sun factor = ', F10.7)
 
@@ -939,7 +943,9 @@ c            dt_any(iz,iw) = 0.79*aircol(iz) * 2.e-17 ! N2 VUV absorption
          wratei = 0.
 
 ***** Main wavelength loop:
+      IF (lsamvb) THEN
          write(*,*) "Before Wavelength Loop"
+      ENDIF
          DO 10, iw = 1, nw-1
 
 ** monochromatic radiative transfer. Outputs are:
@@ -947,7 +953,9 @@ c            dt_any(iz,iw) = 0.79*aircol(iz) * 2.e-17 ! N2 VUV absorption
 *  normalized actinic fluxes  fdir(iz), fdn(zi), fup(iz)
 *  where 
 *  dir = direct beam, dn = down-welling diffuse, up = up-welling diffuse
+      IF (lsamvb) THEN
             write(*,*) "Before rtlink"
+      ENDIF
             CALL rtlink(nstr, nz,
      $           iw, albedo(iw), zen,
      $           dsdh,nid,
@@ -961,7 +969,9 @@ c            dt_any(iz,iw) = 0.79*aircol(iz) * 2.e-17 ! N2 VUV absorption
      $           dtsnw,omsnw,gsnw,
      $           dt_any,om_any,g_any,
      $           edir, edn, eup, fdir, fdn, fup)
+      IF (lsamvb) THEN
                  write(*,*) "After rtlink"
+      ENDIF
 * Spectral irradiance, W m-2 nm-1
 * for downwelling only, use difup = 0.
 
@@ -1145,5 +1155,13 @@ c 444  format(1pe11.4,1x,a50)
       nkj = kj
       END SUBROUTINE tuv4samasp_dims
 
-
-
+*=============================================================================*
+* Turn TUV's per-call progress messages (tuv4samasp, rtlink, psndo) on or off.
+* Set by SAM from its namelist option samasp_verbose; off unless set.
+      SUBROUTINE tuv_set_verbose(flag)
+      IMPLICIT NONE
+      LOGICAL flag
+      LOGICAL lsamvb
+      COMMON /samvrb/ lsamvb
+      lsamvb = flag
+      END

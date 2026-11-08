@@ -47,7 +47,8 @@ NAMELIST /PARAMETERS/ dodamping, doupperbound, docloud, doprecip, &
                 doradlat, doradlon, ncycle_max, doseawater, &
                 dotracerperiodic, massemis, vg, plume_y, plume_x, &
                 fire_nstep_start, fire_i1, fire_i2, fire_k1, fire_k2, &
-                asp_deck_dir, asp_output_dir, year0, asp_co_threshold_ppb
+                asp_deck_dir, asp_output_dir, year0, asp_co_threshold_ppb, &
+                samasp_verbose
 	
 !----------------------------------
 !  Read namelist variables from the standard input:

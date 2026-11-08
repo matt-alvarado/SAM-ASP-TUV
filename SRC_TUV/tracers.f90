@@ -150,6 +150,7 @@ END FUNCTION
  subroutine tracers_init()
   use vars, only: P, tabs
   use params
+  use ModelParameters, only: StepPrints
   use InfrastructuralCode	
   use GridPointFields
   use Chemistry
@@ -592,6 +593,10 @@ deallocate(SaltConcBin)
       enddo
    endif
 
+ ! Per-call progress messages of TUV and ASP only if samasp_verbose is set
+ call tuv_set_verbose(samasp_verbose)
+ StepPrints = samasp_verbose
+
  ! With MPI, make every ASP call start from the particle state saved here
  ! (identical on all ranks), so a cell's result does not depend on which
  ! cells were computed before it on the same rank (or on which rank).
@@ -984,7 +989,7 @@ deallocate(SaltConcBin)
 	        enddo
 !write(*,*) "Fire Loop L963 sum(tracer(i,j,l,:))", sum(tracer(i,j,l,:)) !AD DEBUG
 !write(*,*) "Fire Loop tracers.f90 sum(tracer) L963", sum(tracer) !AD DEBUG
-                write(*,*) "Before input PhotolysisRates"
+                if (samasp_verbose) write(*,*) "Before input PhotolysisRates"
                 PhotolysisRates(:) = PhotoArr(i,j,l,:)
                 ! Rates for species not in TUV (e.g. columns 49-51) are set
                 ! with their scale factors in PhotoMap.in (samasp_photo_map)
@@ -1010,7 +1015,7 @@ deallocate(SaltConcBin)
       call asp_unpack_out(aspout(:,icell), AfterGasConc, MassConc, NumConc, &
                           ExtCoeff, SingScat, Assym)
                 ! start MM DEBUG BLOCK
-                write(*,*) "tracers_physics:L1014 After SAM_wrapper"
+                if (samasp_verbose) write(*,*) "tracers_physics:L1014 After SAM_wrapper"
                 !WRITE(*,*) "shape(ExtCoeff) = ", shape(ExtCoeff)
                 !WRITE(*,*) "shape(SingScat) = ", shape(SingScat)
                 !WRITE(*,*) "shape(Assym) = ", shape(Assym)
@@ -1037,7 +1042,7 @@ deallocate(SaltConcBin)
                 enddo
                 
                 ! start MM DEBUG BLOCK
-                write(*,*) "tracers_physics:L1038 After reassignments" 
+                if (samasp_verbose) write(*,*) "tracers_physics:L1038 After reassignments" 
                 !WRITE(*,*) "shape(ExtCoeffArr) = ", shape(ExtCoeffArr)
                 !WRITE(*,*) "shape(SingScatArr) = ", shape(SingScatArr)
                 !WRITE(*,*) "shape(AssymArr) = ", shape(AssymArr)
@@ -1268,7 +1273,7 @@ deallocate(SaltConcBin)
          !END IF
          ! end MM DEBUG BLOCK
          
-         write(*,*) "Before tuv4samasp", samtstart
+         if (samasp_verbose) write(*,*) "Before tuv4samasp", samtstart
          ! TUV at SAM's site, date (year0, day) and UTC time, on a height grid
          ! whose lowest levels are SAM's layer interfaces
          ! day is the calendar day of year0 as in SAM's CAM radiation
@@ -1279,7 +1284,7 @@ deallocate(SaltConcBin)
                          nzm, samzi, samAOD, samSSA, samASYM, samvalj, &
                          samnj, samjlabel, tuv_nz, tuv_nw, samwc)
          if (.not. tuv_checked) call check_tuv_wavelengths()
-         write(*,*) "After tuv4samasp"
+         if (samasp_verbose) write(*,*) "After tuv4samasp"
          ! Map TUV's J-values to ASP's photolysis columns (PhotoMap.in) and
          ! store them for the next time step
          if (.not. photo_labels_set) call samasp_photo_set_labels(samnj, samjlabel)
@@ -1293,11 +1298,11 @@ deallocate(SaltConcBin)
          do kk=1,nzm
             PhotoArr(i,j,kk,:) = jasp(kk,:)
          enddo !kk=1,nzm
-         write(*,*) "After store PhotolysisRates"
+         if (samasp_verbose) write(*,*) "After store PhotolysisRates"
       enddo
    enddo ! end grid loop
 
-write(*,*) "end tracers_physics loop"
+if (samasp_verbose) write(*,*) "end tracers_physics loop"
 
 !----------------------
  trphys = 0. ! Default tendency due to physics. You code should compute this to output statistics.
@@ -1449,6 +1454,7 @@ write(*,*) "end tracers_physics loop"
 
  ! Run ASP (SAM_wrapper) for n packed cells
  subroutine asp_cells(nin, nout, n, in, out)
+   use params, only: samasp_verbose
    integer, intent(in) :: nin, nout, n
    real*8, intent(in) :: in(nin, n)
    real*8, intent(out) :: out(nout, n)
@@ -1471,8 +1477,8 @@ write(*,*) "end tracers_physics loop"
       k = k + nBins
       PhotolysisRates = in(k+1:k+nPhoto,c)
       AfterGasConc = 0.0D0
-      write(*,*) "PhotolysisRates passed to SAM_wrapper: ", PhotolysisRates !AD DEBUG
-      write(*,*) "Before SAM_wrapper"
+      if (samasp_verbose) write(*,*) "PhotolysisRates passed to SAM_wrapper: ", PhotolysisRates !AD DEBUG
+      if (samasp_verbose) write(*,*) "Before SAM_wrapper"
       call SAM_wrapper(size(GasConc), size(GasConc), sza, GasConc, temptm, prestm, &
                        airdens, tstep, AfterGasConc, MassConc, NumConc, TermVel, &
                        transm, i, l, PhotolysisRates, Ext, Ssa, Asym)

@@ -452,8 +452,18 @@ Timings are asptest (30 steps, 16 MPI ranks oversubscribed on this machine).
   per-cell recomputation of per-bin values in `tracers_init` (~1 s) are
   gone. Output bit-identical; asptest 117 s -> 78 s; start-up to the end of
   initialisation 6.4 s -> 2.9 s.
+- *TUV radiative-transfer arrays and log output*: a profile showed ~12% of
+  CPU in `memset`, nearly all of it TUV's discrete-ordinates solver
+  (`psndo`, `rtrans.f`) clearing work arrays sized for 32 streams on every
+  call, while TUV uses 4 (`nstr` in `INPUTS/samasp`). They are now sized
+  for 4 streams (psndo stops with an error if `nstr` is raised without
+  raising them). Per-call progress messages of SAM, TUV and ASP (~42 MB
+  of log per asptest run) are printed only with the new namelist option
+  `samasp_verbose`; ASP's switch (`StepPrints`, common_ASP) stays on for
+  ASP's own drivers. UNIFAC opens `unifac.err` once instead of on every
+  call. Output bit-identical; asptest 79 s -> 66 s; log 42 MB -> 1.8 MB.
 - Overall, asptest against the pre-submodule baseline (`2ecba69`, same
-  machine and compilers): 579 s -> 78 s, about 7.4 times faster.
+  machine and compilers): 579 s -> 66 s, about 8.8 times faster.
 - Statistics name clash fixed: the ASP gas tracer `MCR` (methacrolein) had
   the same name as SAM's statistic `MCR` (core mass flux), so both
   stat-file profiles named `MCR` held the sum of the two quantities (since
