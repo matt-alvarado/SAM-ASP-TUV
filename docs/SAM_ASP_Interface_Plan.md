@@ -462,8 +462,17 @@ Timings are asptest (30 steps, 16 MPI ranks oversubscribed on this machine).
   `samasp_verbose`; ASP's switch (`StepPrints`, common_ASP) stays on for
   ASP's own drivers. UNIFAC opens `unifac.err` once instead of on every
   call. Output bit-identical; asptest 79 s -> 66 s; log 42 MB -> 1.8 MB.
+- *Gas-phase chemistry evaluators* (common_ASP patch 38): the derivative
+  and Jacobian routines called by the gas-chemistry ODE solver read flat
+  arrays copied once from the mechanism's linked lists, with the same
+  operations in the same order, and the Jacobian skips its empty entries
+  (616^2 checked per Jacobian before, 5,929 non-empty). The solver itself is
+  unchanged. Tested byte-identical on ASP's Lagrangian parcel decks
+  Williams, Otavi, Alaska, Timbavati (baseline mechanism) and
+  Williams_CRACMM3 (all 108 numerical output files each) and on asptest
+  (bit-identical); asptest 66 s -> 54 s.
 - Overall, asptest against the pre-submodule baseline (`2ecba69`, same
-  machine and compilers): 579 s -> 66 s, about 8.8 times faster.
+  machine and compilers): 579 s -> 54 s, about 10.7 times faster.
 - Statistics name clash fixed: the ASP gas tracer `MCR` (methacrolein) had
   the same name as SAM's statistic `MCR` (core mass flux), so both
   stat-file profiles named `MCR` held the sum of the two quantities (since
