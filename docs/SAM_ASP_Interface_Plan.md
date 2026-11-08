@@ -6,7 +6,8 @@ code. SAM should take every count, offset and index from ASP at run time, and it
 should stop with a clear message when something cannot be matched.
 
 Status (see §5 for details): phases 0, 1 (partly) and 2 are done on branch
-`claude/sam-asp-hardcoded-links-pstj1y`; the code builds with Intel ifx
+`asp_v2.2.2` (developed as `claude/sam-asp-hardcoded-links-pstj1y`); the code
+builds with Intel ifx
 (`build_ifx.sh`) and the short `RUNS/asptest` case runs (`run_asptest_ifx.sh`).
 
 ---
