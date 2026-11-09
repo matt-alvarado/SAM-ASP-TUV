@@ -480,6 +480,18 @@ Timings are asptest (30 steps, 16 MPI ranks oversubscribed on this machine).
   calling TUV; the whole-array bad-value checks of the optics arrays run once
   per step instead of after every plume cell. Output bit-identical; asptest
   54 s -> 52 s (TUV was ~9% of CPU, ~3 s of wall time here).
+- *Meteorology from ERA5* (`create_run.py`, `samasp_case/`,
+  `RUNDATA/prm_template`): the case files are made from the ERA5 column
+  nearest the fire (Copernicus CDS; only a 3 x 3 point box and one hour are
+  downloaded and cached) instead of whole-month NARR and whole-year NCEP
+  files from NOAA's old FTP server. One global 0.25 deg hourly source for the
+  sounding, boundary-layer height, heat fluxes and surface stress (NARR is
+  32 km, North America only, with NCEP R1 at ~1.9 deg for the stress).
+  Command-line interface; the old params.txt still works; the prm comes from
+  a template holding the previous settings plus the newer SAM-ASP options as
+  comments. Same conversions and wind rotation as before; surface stress
+  divided by the actual air density (was 1.2 kg/m3). Offline tests in
+  `tests/`; a case written from synthetic ERA5 files ran in SAM (100 steps).
 - Overall, asptest against the pre-submodule baseline (`2ecba69`, same
   machine and compilers): 579 s -> 52 s, about 11 times faster.
 - Statistics name clash fixed: the ASP gas tracer `MCR` (methacrolein) had

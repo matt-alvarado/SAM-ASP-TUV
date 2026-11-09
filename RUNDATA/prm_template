@@ -1,0 +1,91 @@
+ &MICRO_M2005
+ doicemicro = .false.
+ /
+
+ &PARAMETERS
+ ! SAM-ASP case written by create_run.py from this template.
+ ! Fields in braces are filled in for each case; edit anything else here
+ ! (or pass --prm-template to use another template).
+ caseid = '{caseid}',
+ nrestart = 0,
+
+ CEM = .true.,
+ LAND = .true.,
+ OCEAN = .false.,
+
+ dosgs        = .true.,
+ dodamping    = .true.,
+ doupperbound = .false.,
+ docloud      = .true.,
+ doprecip     = .false.,
+ dolongwave   = .false.,
+ doshortwave  = .false.,
+ dosurface    = .true.,
+ dolargescale = .true.,
+ doradforcing = .false.,
+ dotracers    = .true.,
+ dosfcforcing = .true.,
+ docoriolis   = .true.,
+ donudging_uv = .true.,
+ donudging_tq = .true.,
+ tauls        = 3600.,
+
+ SFC_FLX_FXD    = .true.,
+ SFC_TAU_FXD    = .true.,
+
+ latitude0 = {latitude0},
+ longitude0 = {longitude0},
+
+ fcor = 0.376e-4,
+
+ dx = 500.,
+ dy = 500.,
+ dt = {dt},
+
+ ! calendar day of year0 as in SAM's CAM radiation (1.0 = 1 January 00 UTC)
+ day0 = {day0},
+ year0 = {year0},
+
+ nstop = {nstop},
+ nrestart_skip = {nstop},
+
+ nprint = 100,
+ nstat = 100,
+ nstatfrq = 5,
+
+ doSAMconditionals = .false.
+ dosatupdnconditionals = .false.
+
+ nsave2D      = 20,
+ nsave2Dstart = 99999999,
+ nsave2Dend   = 999164000,
+ save2Dbin    = .true.
+
+ nsave3D      = 20,
+ nsave3Dstart = 20,
+ nsave3Dend   = 999999999,
+ save3Dbin    = .true.
+
+ nstatmom      = 20
+ nstatmomstart = 9999999
+ nstatmomend   = 99960480
+ savemombin    = .true.
+
+ perturb_type = 5,
+
+ dotracerperiodic = .true.,
+
+ massemis = {massemis},
+ ! mean boundary-layer wind along SAM y from the ERA5 profile (m/s)
+ vg = {vg},
+ plume_y = 1000.,
+
+ ! SAM-ASP-TUV settings (defaults shown; uncomment to change):
+ ! fire_nstep_start = 1080,              ! fire emissions start after this step
+ ! fire_i1 = 100, fire_i2 = 115,         ! fire box: global x indices
+ ! fire_k1 = 32, fire_k2 = 55,           !           and levels
+ ! asp_co_threshold_ppb = 130.,          ! ASP runs where CO exceeds this
+ ! asp_deck_dir = 'SRC_TUV/ASP/InorganicInputDecks/',
+ ! asp_output_dir = 'SRC_TUV/ASP/OutputFiles/',
+ ! samasp_verbose = .false.,             ! per-call progress messages
+ /

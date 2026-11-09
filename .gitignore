@@ -19,3 +19,6 @@ __pycache__/
 # In-place TUV build outputs (SRC_TUV/TUV/Makefile_SAM without TUV_BUILD_DIR)
 /SRC_TUV/TUV/*.o
 /SRC_TUV/TUV/libTuvLibrary.a
+# create_run.py downloads (ERA5; NCEP/ from the old NARR version)
+/ERA5_cache/
+/NCEP/
