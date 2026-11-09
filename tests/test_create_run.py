@@ -153,28 +153,39 @@ class Derived(unittest.TestCase):
         d = case_files.derived(m, 'Ay')
         np.testing.assert_allclose(d['ptemp'], m.temp * (1000.0 / m.level) ** case_files.RC)
         np.testing.assert_allclose(d['wmix'], m.shum / (1 - m.shum) * 1000.0)
-        # Ay: SAM y along the wind at the reference level (first level below the
-        # boundary-layer top): there vls = wind speed and uls = 0
+        # boundary-layer levels: above ground (1000 hPa is below the 988.77 hPa
+        # surface here) and below the boundary-layer top
         ptop = min(d['hpblp'], m.psfc - 50.0)
-        k = np.where(m.level > ptop)[0][0]
-        self.assertAlmostEqual(d['vls'][k], np.hypot(m.u[k], m.v[k]), places=10)
-        self.assertAlmostEqual(d['uls'][k], 0.0, places=10)
+        bl = (m.level <= m.psfc) & (m.level > ptop)
+        np.testing.assert_array_equal(d['inbl'], bl)
+        self.assertFalse(d['inbl'][0])
+        self.assertTrue(bl.sum() >= 2)
+        # Ay: SAM y along the mean boundary-layer wind: after rotation its mean
+        # x component is 0 and its mean y component is the mean wind's speed
+        mu, mv = np.mean(m.u[bl]), np.mean(m.v[bl])
+        self.assertAlmostEqual(float(np.mean(d['uls'][bl])), 0.0, places=10)
+        self.assertAlmostEqual(float(np.mean(d['vls'][bl])), float(np.hypot(mu, mv)), places=10)
         # rotation keeps wind speed at every level
         np.testing.assert_allclose(np.hypot(d['uls'], d['vls']), np.hypot(m.u, m.v))
-        # vg: mean of vls over the levels below the boundary-layer top
-        self.assertAlmostEqual(d['vg'], float(np.mean(d['vls'][m.level > ptop])), places=12)
+        # vg: mean of vls over the boundary-layer levels
+        self.assertAlmostEqual(d['vg'], float(np.mean(d['vls'][bl])), places=12)
         # tau = |stress| / rho with rho from surface pressure and 2 m temperature
         rho = m.psfc * 100 / (case_files.RD * m.t2m)
         self.assertAlmostEqual(d['tau'], np.hypot(0.15, -0.12) / rho, places=12)
 
-    def test_vg_matches_original_running_mean(self):
-        m = self.column()
+    def test_no_level_in_boundary_layer(self):
+        # the layer is at least 50 hPa deep (ptop <= psfc - 50), so with ERA5's
+        # 25-50 hPa spacing it always holds a level; with sparser levels it can
+        # be empty, and then the lowest level above the ground is used
+        lev = np.array([1000.0, 850.0, 700.0, 500.0])
+        t, q, u, v = profile(lev)
+        m = era5.MetColumn(level=lev, temp=t, shum=q, u=u, v=v, psfc=990.0, hpbl=300.0,
+                           shf=0.0, lhf=0.0, taux=0.1, tauy=0.0, t2m=290.0,
+                           lat=0.0, lon=0.0, time=T_VALID)
         d = case_files.derived(m, 'Ay')
-        vg = 0.0                                             # original create_run.py loop
-        for z in range(len(m.level)):
-            if m.level[z] > min(d['hpblp'], m.psfc - 50.0):
-                vg = vg * z / (z + 1.) + d['vls'][z] / (z + 1.)
-        self.assertAlmostEqual(d['vg'], vg, places=12)
+        np.testing.assert_array_equal(d['inbl'], [False, True, False, False])
+        self.assertAlmostEqual(d['uls'][1], 0.0, places=10)
+        self.assertAlmostEqual(d['vg'], float(np.hypot(u[1], v[1])), places=10)
 
     def test_other_axes(self):
         m = self.column()

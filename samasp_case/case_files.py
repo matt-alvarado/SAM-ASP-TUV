@@ -1,8 +1,9 @@
 """Write a SAM-ASP case (snd, lsf, sfc, prm, grd, lst) from a MetColumn.
 
 The meteorology is held constant: the same profile is written at NPTS times
-one day apart (SAM needs input times spanning the run). The conversions and
-the wind rotation are those of the original create_run.py (NARR version).
+one day apart (SAM needs input times spanning the run). The conversions are
+those of the original create_run.py (NARR version); the wind axes ('Ax', 'Ay')
+and vg use the mean wind over the boundary-layer levels above the ground.
 """
 import datetime as dt
 import os
@@ -29,7 +30,8 @@ def derived(m, wind_axis='Ay', theta=np.pi * 0.40):
 
     Returns dict with ptemp (K), wmix (g/kg), uls, vls (m/s, rotated to the
     SAM axes), vg (mean boundary-layer wind along SAM y, m/s), hpblp (hPa),
-    tau (u*^2, m2 s-2), theta (rotation angle used, rad).
+    tau (u*^2, m2 s-2), theta (rotation angle used, rad), inbl (the
+    boundary-layer levels: above ground, below the boundary-layer top).
     """
     if wind_axis not in WIND_AXES:
         raise ValueError('wind_axis must be one of %s' % (WIND_AXES,))
@@ -39,11 +41,17 @@ def derived(m, wind_axis='Ay', theta=np.pi * 0.40):
     # boundary-layer top in pressure (lowest-level temperature, < 2% error)
     hpblp = m.psfc * np.exp(-m.hpbl / (HOVERT * temp[0]))
     ptop = min(hpblp, m.psfc - 50.0)
+    # boundary-layer levels: above the ground (ERA5 also gives values below
+    # it, extrapolated) and below the boundary-layer top; if no level lies
+    # in that layer, the lowest level above the ground
+    above = level <= m.psfc
+    inbl = above & (level > ptop)
+    if not inbl.any():
+        inbl = np.zeros_like(above)
+        inbl[np.where(above)[0][0]] = True
     if wind_axis in ('Ax', 'Ay'):
-        # As in the original script: the wind direction at the first level
-        # (from the surface) whose pressure exceeds ptop.
-        k = np.where(level > ptop)[0][0]
-        theta = float(np.arctan2(v[k], u[k]))
+        # direction of the mean boundary-layer wind (vector mean of u and v)
+        theta = float(np.arctan2(np.mean(v[inbl]), np.mean(u[inbl])))
     if wind_axis == 'N':
         uls, vls = v, -u
     elif wind_axis == 'S':
@@ -61,12 +69,11 @@ def derived(m, wind_axis='Ay', theta=np.pi * 0.40):
     else:                                  # 'U': all wind along SAM x
         uls, vls = np.sqrt(u ** 2 + v ** 2), v * 0.0
     # mean boundary-layer wind along SAM y (plume transport speed)
-    inbl = level > ptop
-    vg = float(np.mean(vls[inbl])) if inbl.any() else 0.0
+    vg = float(np.mean(vls[inbl]))
     rho = m.psfc * 100.0 / (RD * m.t2m)
     tau = float(np.hypot(m.taux, m.tauy) / rho)
     return dict(ptemp=ptemp, wmix=wmix, uls=uls, vls=vls, vg=vg, hpblp=hpblp,
-                tau=tau, theta=theta, rho=rho)
+                tau=tau, theta=theta, rho=rho, inbl=inbl)
 
 
 def write_case(casedir, m, d, prm_template, prm_values, lst_file):

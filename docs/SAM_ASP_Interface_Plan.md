@@ -489,8 +489,13 @@ Timings are asptest (30 steps, 16 MPI ranks oversubscribed on this machine).
   32 km, North America only, with NCEP R1 at ~1.9 deg for the stress).
   Command-line interface; the old params.txt still works; the prm comes from
   a template holding the previous settings plus the newer SAM-ASP options as
-  comments. Same conversions and wind rotation as before; surface stress
-  divided by the actual air density (was 1.2 kg/m3). Offline tests in
+  comments. Same conversions as before; surface stress divided by the
+  actual air density (was 1.2 kg/m3). The SAM axes ('Ay'/'Ax') follow the
+  mean boundary-layer wind (vector mean over the levels above the ground and
+  below the boundary-layer top), and vg is the mean along y over the same
+  levels; before, the axis followed the wind at a single level (often
+  1000 hPa, which can be below the ground) and vg also averaged levels below
+  the ground. Offline tests in
   `tests/`; a case written from synthetic ERA5 files ran in SAM (100 steps).
 - Overall, asptest against the pre-submodule baseline (`2ecba69`, same
   machine and compilers): 579 s -> 52 s, about 11 times faster.
