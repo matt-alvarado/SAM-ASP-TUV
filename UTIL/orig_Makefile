@@ -1,3 +1,10 @@
+# The SAM distribution's original UTIL Makefile (SAM 6.10), kept for reference.
+# Machine: none of rotor's. Its active Linux section uses Intel 11.1
+# compilers (/opt/intel/Compiler/11.1/080) and NetCDF 3.6.3 under /usr/local,
+# from the SAM developers' setup; the commented sections are for AIX,
+# IRIX64, Mac OS X, and "seawulf", the Stony Brook University Linux cluster
+# (its own comment, "seawulf@sunysb"). Build the tools with build_util.sh.
+#
 # Makefile to compile conversion utilities. You need to set include and library paths for NETCDF
 #
 

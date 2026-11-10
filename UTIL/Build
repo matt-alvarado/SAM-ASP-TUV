@@ -1,4 +1,17 @@
 #! /bin/csh -f
+# Legacy UTIL build script (runs Makefile), kept for reference.
+#
+# Machine: "rotor", the Linux x86_64 server the original SAM-ASP-TUV was
+# built on (the top-level Makefile tests $(HOSTNAME) for rotor). Evidence:
+# the paths (/rotor/data/p1808/CMAQv5.0.1/... for NetCDF built with ifort;
+# Intel-built HDF5 1.8.6 and zlib 1.2.5 under /usr/local), and the old
+# prebuilt UTIL binaries (removed; most likely built with this file): SUSE
+# Linux (glibc 2.11.1, gcc 4.3.4, i.e. SLES 11 era), Intel Fortran 15.0
+# run-time library (2015), NetCDF built with Intel icc 12.0. Its project
+# data later sat under /nas/data_cellar/rotor/data/ (see
+# SRC_TUV/ASP/Makefile.out).
+# These paths do not exist elsewhere: build the tools with build_util.sh.
+#
 
 # specify the scratch directory where object files as well as
 # restart and large output data file will be located :

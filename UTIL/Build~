@@ -1,4 +1,8 @@
 #! /bin/csh -f
+# Editor backup of Build, kept for reference. Machine: not identified; it
+# points at a SAM 6.10.10 copy in a user's home directory
+# (/home/<user>/SAM6.10.10); the current Build uses rotor's
+# /rotor/data/AQRP. Build the tools with build_util.sh.
 
 # specify the scratch directory where object files as well as
 # restart and large output data file will be located :
