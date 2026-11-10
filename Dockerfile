@@ -77,6 +77,8 @@ RUN --mount=type=secret,id=ca,required=false \
     rm -f /usr/local/share/ca-certificates/build-ca.crt && update-ca-certificates --fresh > /dev/null && \
     rm -rf /var/lib/apt/lists/*
 COPY --from=build /runtime-libs/opt /opt
+# the prebuilt post-processing tools in UTIL/ (bin2D2nc, ...) link libz.so
+RUN ln -s libz.so.1 /usr/lib/x86_64-linux-gnu/libz.so
 COPY --from=build /opt/sam-asp-tuv /opt/sam-asp-tuv
 ENV SAMASP_HOME=/opt/sam-asp-tuv \
     CDSAPI_URL=https://cds.climate.copernicus.eu/api \
