@@ -24,7 +24,9 @@ the old input file format. Tests (offline): `python3 -m unittest discover -s tes
 ## Running in a container
 
 See [docs/Container_User_Guide.md](docs/Container_User_Guide.md) for the full
-guide (settings, ASP decks, ERA5, outputs, troubleshooting, and running on AWS).
+guide (settings, ASP decks, ERA5, outputs, troubleshooting, and running on AWS),
+and [docs/OnPrem_RHEL_CMMC_Guide.md](docs/OnPrem_RHEL_CMMC_Guide.md) for an on-prem
+RHEL VM in a CMMC Level 2 (CUI) enclave, with rootless Podman.
 
 The `Dockerfile` builds the model (Intel ifx, Open MPI, NetCDF) and runs one
 fire case per container. Build once (the common_ASP submodule must be checked

@@ -2,7 +2,9 @@
 
 This guide covers building the SAM-ASP-TUV container image, running fire cases
 with it on any Linux machine with Docker, and running it on Amazon Web
-Services (AWS).
+Services (AWS). For an on-prem RHEL virtual machine in a CMMC Level 2 (CUI)
+enclave, with rootless Podman, see also the
+[on-prem guide](OnPrem_RHEL_CMMC_Guide.md).
 
 SAM-ASP-TUV couples three models:
 

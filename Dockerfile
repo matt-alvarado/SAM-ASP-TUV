@@ -11,7 +11,8 @@
 #   --secret id=ca,src=ca.crt     extra CA certificate, for building behind a
 #                                 TLS-intercepting proxy (used during the build only)
 
-ARG UBUNTU=ubuntu:24.04
+# fully qualified, so Podman/Buildah (RHEL) need no short-name lookup
+ARG UBUNTU=docker.io/library/ubuntu:24.04
 
 # ---------------------------------------------------------------- toolchain
 FROM ${UBUNTU} AS build

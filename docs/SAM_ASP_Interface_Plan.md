@@ -545,3 +545,13 @@ Timings are asptest (30 steps, 16 MPI ranks oversubscribed on this machine).
   binaries wanted. Only `bin2D2nc` and `stat2nc` were tested on model output
   (asptest writes no 3D, com, 2D-bin or satellite-simulator files); all 23
   tools compile and load their libraries in the image.
+- On-prem guide for a RHEL 9 VM in a CMMC Level 2 (CUI) enclave
+  (`docs/OnPrem_RHEL_CMMC_Guide.md`): items to agree with the ISSO (with the
+  NIST SP 800-171 requirements they touch), administrator setup for rootless
+  Podman, building on the VM or transferring the image, running with `:Z`
+  mounts, the CDS key as a mounted file, long runs as systemd user services,
+  data handling, records and patching. Tested here: the image under rootless
+  Podman 4.9 (72-step case, outputs byte-identical to Docker, owned by the
+  user) and peak memory (about 1.1 GB for 16 ranks). The Dockerfile's base
+  image is now fully qualified (`docker.io/library/ubuntu:24.04`) so Podman
+  needs no short-name lookup.
