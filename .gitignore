@@ -22,4 +22,3 @@ __pycache__/
 # create_run.py downloads (ERA5; NCEP/ from the old NARR version)
 /ERA5_cache/
 /NCEP/
-UTIL/stat2nc

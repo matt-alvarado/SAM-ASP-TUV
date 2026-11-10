@@ -26,8 +26,8 @@ c variables:
 	integer i,j,k,k1,k2,n,i0,j0,nx_gl,ny_gl,length,ifields
 
 	integer vdimids(4),start(4),count(4),ndimids,nfile
-	integer ncid,err,zid,yid,xid,timeid,varid(99),varrr,ntime
-	integer varid2D(99)
+	integer ncid,err,zid,yid,xid,timeid,varid(10000),varrr,ntime
+	integer varid2D(10000)
 	integer nrecords
 c External functions:
 

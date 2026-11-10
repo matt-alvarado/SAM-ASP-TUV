@@ -59,10 +59,10 @@ RUN test -f SRC_TUV/ASP/src/StepASP4SAM.f90 || \
     echo $((NSUBDOMAINS_X * ny)) > NRANKS && \
     SAMASP_ENV=/opt/samasp-env.sh ./build_ifx.sh > /tmp/build.out 2>&1 || \
         { tail -30 /tmp/build.out; tail -40 _build/sam_build.log 2>/dev/null; exit 1; } && \
-    SAMASP_ENV=/opt/samasp-env.sh UTIL/build_stat2nc.sh > /dev/null && \
+    SAMASP_ENV=/opt/samasp-env.sh UTIL/build_util.sh > /dev/null && \
     rm -rf _build OBJ && \
     mkdir -p /runtime-libs && \
-    ldd SAM_RAD_CAM_MICRO_M2005_w_aero UTIL/stat2nc | awk '$3 ~ /^\/opt\// {print $3}' | \
+    ldd SAM_RAD_CAM_MICRO_M2005_w_aero $(sed -n 's/^\///p' UTIL/.gitignore) | awk '$3 ~ /^\/opt\// {print $3}' | \
         sort -u | xargs -I{} cp --parents -L {} /runtime-libs/
 
 # ---------------------------------------------------------------- runtime
@@ -78,8 +78,6 @@ RUN --mount=type=secret,id=ca,required=false \
     rm -f /usr/local/share/ca-certificates/build-ca.crt && update-ca-certificates --fresh > /dev/null && \
     rm -rf /var/lib/apt/lists/*
 COPY --from=build /runtime-libs/opt /opt
-# the prebuilt post-processing tools in UTIL/ (bin2D2nc, ...) link libz.so
-RUN ln -s libz.so.1 /usr/lib/x86_64-linux-gnu/libz.so
 COPY --from=build /opt/sam-asp-tuv /opt/sam-asp-tuv
 ENV SAMASP_HOME=/opt/sam-asp-tuv \
     CDSAPI_URL=https://cds.climate.copernicus.eu/api \

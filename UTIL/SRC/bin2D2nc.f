@@ -24,7 +24,7 @@ c variables:
 
 	integer vdimids(4),start(4),count(4),ndimids,nfile
 	integer ncid,err,zid(1),yid(1),xid(1),timeid(1)
-        integer varid(99),varrr(1),ntime
+        integer varid(10000),varrr(1),ntime  ! SAM-ASP: one per field, often >99
 	integer nrecords
 c External functions:
 

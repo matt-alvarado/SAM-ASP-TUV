@@ -411,8 +411,14 @@ Everything goes to the mounted output directory:
 
 ### 9.1 Converting outputs to netCDF
 
-The image includes SAM's conversion tools in `/opt/sam-asp-tuv/UTIL`. To
-convert the 2-D field snapshots:
+The image includes SAM's conversion tools in `/opt/sam-asp-tuv/UTIL`
+(`bin2D2nc`, `stat2nc`, `bin3D2nc`, `com3D2nc`, `2Dbin2nc`, and the rest).
+They are built from source (`UTIL/SRC`) with the model; the repository keeps
+no prebuilt binaries. Outside the container, build them with
+`UTIL/build_util.sh` (all tools), or for example `UTIL/build_util.sh
+stat2nc`; it uses the same environment file as `build_ifx.sh`.
+
+To convert the 2-D field snapshots:
 
 ```bash
 docker run --rm -v ~/samasp/results/OUT_3D:/data -w /data \
@@ -428,16 +434,13 @@ docker run --rm -v ~/samasp/results/OUT_STAT:/data -w /data \
 # writes fire_fire.nc: every profile on (time, z), plus the time series
 ```
 
-`stat2nc` in the image is built from source with the model, and handles
-SAM-ASP-TUV files with thousands of profiles. Notes on its output:
+`stat2nc` handles SAM-ASP-TUV files with thousands of profiles. Notes on
+its output:
 
 - netCDF names can't start with `(`. Species such as `(NH4)2SO401` are
   written as `_(NH4)2SO401`, and their original name is kept in the
   attribute `sam_name`.
 - The file is netCDF-3 with 64-bit offsets, so it can be larger than 2 GB.
-- Outside the container, build it with `UTIL/build_stat2nc.sh` (it uses the
-  same environment file as `build_ifx.sh`). The repository has no prebuilt
-  `stat2nc` binary; it is always built from source.
 
 ---
 

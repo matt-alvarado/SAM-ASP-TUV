@@ -529,6 +529,19 @@ Timings are asptest (30 steps, 16 MPI ranks oversubscribed on this machine).
   file scan per profile); names netCDF rejects (`(NH4)2SO401`) get a leading
   `_` with the original in `sam_name`; 64-bit-offset netCDF. asptest: all
   9,144 profiles at all 3 times equal the raw file exactly. Built from source
-  in the container (`UTIL/build_stat2nc.sh`). The old prebuilt `UTIL/stat2nc`
-  binary was removed from the repository (and is git-ignored), so it is only
-  built from source.
+  in the container. The old prebuilt `UTIL/stat2nc` binary was removed from
+  the repository.
+- All UTIL post-processing tools are now built from source only
+  (`UTIL/build_util.sh`, run by the Dockerfile; binaries are git-ignored via
+  `UTIL/.gitignore`). The 22 old prebuilt binaries (and a stray `a.out`) were
+  removed; `2Dcom2nc_sep` had a source but no binary and is now built too.
+  Building from source exposed a bug: `bin2D2nc` and `com2D2nc` kept the
+  netCDF variable ids in `varid(99)`, and SAM-ASP files have 143 fields, so
+  the array overflowed. With the old binary this silently corrupted the first
+  time value (1.9e-43 instead of 321.83 days) and `TotCa` at the 2nd and 3rd
+  output times; with the new build it corrupted `x`. Now `varid(10000)`.
+  asptest: the new `bin2D2nc` output equals the raw `.bin2D` data for all 143
+  fields at all 3 times. The image no longer needs the `libz.so` link the old
+  binaries wanted. Only `bin2D2nc` and `stat2nc` were tested on model output
+  (asptest writes no 3D, com, 2D-bin or satellite-simulator files); all 23
+  tools compile and load their libraries in the image.
