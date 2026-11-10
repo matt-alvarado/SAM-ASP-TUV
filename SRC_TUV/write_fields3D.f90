@@ -294,7 +294,7 @@ do igs = 1, size(jval3d_labels)
               trim(jval3d_labels(igs)), '; not written'
    end if
 end do
-nfields=47+ngas3d+njval3d ! 47 fields besides the gas species and J-values
+nfields=37+nBins+ngas3d+njval3d ! 37 fixed fields, one particle number per size bin, the gas species and J-values
 if(.not.docloud) nfields=nfields-1
 if(.not.doprecip) nfields=nfields-1
 !bloss: add 3D outputs for microphysical fields specified by flag_micro3Dout

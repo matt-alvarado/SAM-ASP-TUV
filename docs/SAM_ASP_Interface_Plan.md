@@ -567,3 +567,21 @@ Timings are asptest (30 steps, 16 MPI ranks oversubscribed on this machine).
   libraries were looked up without the `UTIL/` prefix. The on-prem guide now
   assumes a 16-vCPU AMD VM with 64 GB and an NVIDIA L4 (not used: the model
   is CPU/MPI only).
+- Fire cases (`cases/`) from the SAM-ASP-TUV v1.0.0 release (Zenodo
+  10.5281/zenodo.13385240): `williams_flats_2019` (SND1; the v1.0.0 decks =
+  the image's default decks, old 2x4-bin organic scheme; warm-bubble start via
+  `SAM_SET`), `williams_2009` (W1101/tuvtest; ASP repository `Williams/`
+  baseline deck + `PhotoMap.in`, converted to 10 size bins; start 19:00 UTC), `bbop_colockum_2013`
+  (ADTEST/SAMASP0001; 2013-08-09 18:49 UTC; no decks). Each has `case.env`
+  for `--env-file`. New: `run_case.py` `--set` / `SAM_SET` (extra namelist
+  settings) and the `NTRACERS` build-arg in both Dockerfiles (Williams 2009
+  needs 1486, the default decks 1488). All cases use 10 size bins: with 40
+  bins (4096 tracers) the Williams deck failed in SAM's sectional coagulation.
+  SAM-ASP-TUV now always sets ASP's PhotoFlag after reading the decks
+  (`tracers.f90`): photolysis is TUV's online rates, and ASP parcel decks
+  with `PHOTO FLAG = 0` no longer stop the run.
+  Fixed `write_fields3D.f90`: the 3D field count assumed 10 size bins (one
+  particle-number field per bin); now 37 + nBins + gases + J-values.
+- The ASP repository (asp_v2.2.2) gained `WilliamsFlats` decks for the baseline
+  and all eight other mechanisms, built from the v1.0.0 decks with the 9-bin
+  volatility scheme (`WilliamsFlatsTranslation/`).

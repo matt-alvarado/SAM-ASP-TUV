@@ -1,0 +1,35 @@
+!! AqPhaseIons.in
+!! ASP
+!! Matt Alvarado, 2004-2013 (c)
+!! Based on MELAM by Donnan Steele, 2000-2004 (c)
+!!
+!! This Input Deck Details the Aqueous Phase Ions.                    !!
+!! It is read in by SetAqPhaseChemistry() in AqPhaseChemistry.h       !!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!
+!! Make another input deck which has stuff related to the 
+!! activities of each of the ions
+!!
+!! The input file has three columns, separated by semi-colons :
+!! ION NAME
+!! CHARGE (Z units: ...-1,1,2,...)
+!! MASS (g/mole)
+!! IONIC REFRACTION
+!! (From Tang et. al., JGR V.102, D19, pp. 23269-23275, 1997. or
+!!  Tang, JGR V.102, D2, pp. 1883-1893, 1997.)
+!!
+!! Please make sure to specify a line for H+ and OH- (it will be looked for in the system for pH calculations)
+H+     ; 1 ; 1.008	; 0.
+NH4+   ; 1 ; 18.042	; 5.01
+K+     ; 1 ; 39.0983	; 3.21
+Na+    ; 1 ; 22.990	; 0.86
+Mg++   ; 2 ; 24.305	; 0.03
+Ca++   ; 2 ; 40.078 	; 1.93
+!
+HSO4-  ;-1 ; 97.068	; 13.44 
+SO4--  ;-2 ; 96.06 	; 13.44
+!HCO3- ;-1 ; 60.992	; 0.
+!CO3-- ;-2 ; 59.984	; 0.
+NO3-   ;-1 ; 62.01 	; 10.36
+Cl-    ;-1 ; 35.45	; 8.09 
+OH-    ;-1 ; 17.008	; 0.

@@ -23,6 +23,7 @@ module tracers
  use samasp_layout
  use samasp_photo
  use samasp_balance, only: balanced_compute
+ use ModelParameters, only: PhotoFlag, SetPhotoFlag
  implicit none
 
  real tracer  (dimx1_s:dimx2_s, dimy1_s:dimy2_s, nzm, 0:ntracers)
@@ -225,6 +226,12 @@ END FUNCTION
 
   call InitializeASP(doAerosols, DeckDir=trim(asp_deck_dir), &
                      OutputDir=trim(asp_output_dir))
+  ! Photolysis is always computed online by TUV in SAM-ASP-TUV (PhotoArr, every
+  ! step, via PhotoMap.in); ASP then uses those rates only with PhotoFlag on,
+  ! so the deck's PHOTO FLAG (0 in ASP parcel decks) is overridden.
+  if (.not. PhotoFlag .and. masterproc) write(*,*) &
+     'ASPInputDeck.in PHOTO FLAG = 0 ignored: photolysis rates are computed online by TUV'
+  call SetPhotoFlag(1)
   call ReadBoundaryDistributionsOrganic
   call PopulateParticlesSectionsRightAway(.TRUE.)
   call SortBoundaryPart

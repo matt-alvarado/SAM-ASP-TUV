@@ -130,6 +130,7 @@ checked out.
 | `--build-arg NSUBDOMAINS_X=8` | Number of MPI ranks (subdomains in x). It must divide 240, so 4, 6, 8, 10, 12, 16, 20, 24, … work; the default is 16. Choose it to match the physical cores of the machine you'll run on ([section 10](#10-performance-and-machine-size)). |
 | `--secret id=ca,src=/path/to/ca.crt` | An extra CA certificate, for building behind a corporate proxy that intercepts TLS. It's used only during the build and not kept in the image. |
 | `--build-arg HTTPS_PROXY=http://proxy:port` | Standard Docker proxy settings, if your network needs them. |
+| `--build-arg NTRACERS=4096` | SAM tracer count, for ASP decks other than the default set (the model prints the value your decks need). See [section 6](#6-asp-input-decks). |
 | `-f Dockerfile.ubi9` | Build the **RHEL 9** image instead (Red Hat Universal Base Image 9), for sites that need the container's OS to be RHEL. Same model, entry point and settings; results are identical. See the [on-prem guide](OnPrem_RHEL_CMMC_Guide.md). |
 
 It's useful to tag the image with the rank count and the code version, for example:
@@ -250,13 +251,17 @@ Options win over variables.
 | `OUTPUT_DIR` | `--output` | Output directory inside the container | `/output` |
 | `CDSAPI_KEY` | | Your CDS API key, for downloading ERA5 | |
 | `ERA5_PL_FILE`, `ERA5_SL_FILE` | `--era5-pl`, `--era5-sl` | ERA5 pressure-level and single-level netCDF files to use instead of downloading | |
+| `SAM_SET` | `--set` (repeatable) | Extra SAM `&PARAMETERS` settings for this run, `NAME=VALUE` in Fortran syntax, separated by `;` in `SAM_SET` (e.g. `perturb_type=2;bubble_dtemp=10.`) | |
 
 Other model settings, such as the fire box, the CO threshold for running
 ASP, output intervals, and SAM physics switches, come from the namelist
-template `RUNDATA/prm_template`. To change them for all runs, edit the
-template and rebuild the image. For a single run, mount your own template
-and use the case builder directly; see [12](#12-troubleshooting), "changing
-other namelist settings".
+template `RUNDATA/prm_template`. For a single run, set them with `SAM_SET` or
+`--set`; to change them for all runs, edit the template and rebuild the image.
+
+**Prepared cases.** `cases/` holds the settings (`case.env`) and ASP decks of
+the fires in the SAM-ASP-TUV v1.0.0 release: Williams Flats 2019, Williams
+2009, and BBOP 2013 (no decks yet). Run one with
+`--env-file cases/<case>/case.env`; see `cases/README.md`.
 
 ---
 
@@ -298,7 +303,16 @@ Notes:
   species and size bin. The image is compiled for the default deck's tracer
   count, and the model stops at start-up with the required value if your
   decks need a different number. To use decks with a different species list,
-  set `ntracers` in `SRC_TUV/domain.f90` to that value and rebuild the image.
+  build the image with `--build-arg NTRACERS=<that value>` (it sets `ntracers`
+  in `SRC_TUV/domain.f90`). The count grows with the number of size bins.
+- **Size bins.** Use 10 aerosol size bins (as all decks in `cases/`). ASP
+  repository decks have 40 bins (4096 tracers, about 2.75 times the work), and
+  with 40 bins the Williams deck fails in SAM's sectional coagulation; convert
+  them with the three sectional lines of `AerosolModes.in` (1.01 um cutoff, 10
+  bins, 0.025 um lower cutoff).
+- **Photolysis** is computed online by TUV at every step. The deck's
+  `PhotoRates.in` is read only for its layout, and its `PHOTO FLAG` in
+  `ASPInputDeck.in` is overridden.
 - **Mechanisms.** The SAM-ASP-TUV interface reads species, bins and
   photolysis mapping from the decks at run time. Decks for other mechanisms
   (the ASP repository's CB6r5, SAPRC07, CRACMM, GEOS-Chem, MCM decks) also need

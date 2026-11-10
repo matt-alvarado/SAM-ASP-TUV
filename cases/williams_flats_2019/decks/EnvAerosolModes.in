@@ -1,0 +1,100 @@
+!! Donnan Steele 
+!! MELAM -- (c) 2001-2004
+!! Updated by Matt Alvarado, (c) 2004-2013
+!!
+!! This input deck specifies the traits of aerosol distributions
+!! from which the particles are to be sampled for the ENVIRONMENTAL aerosol
+!! (that is, not the initial aerosol in the plume).
+!! 
+!! These should be dry particle values, since the resulting particles
+!! will be allowed to reach equilibrium with the ambient water as an
+!! initializing first step of the model.
+!!
+!!  NOTE: The sectional parameters are assumed to be the same as in AerosolModes.in
+!!  Also, if you choose monodisperse or bulk aerosol, that holds here as well.
+!!
+!!   Nt is the total number of particles (particles per cc)
+!!   Dbar_g_N geometric mean diameter (number median diameter) (microns)
+!!   Rho_g Standard Deviation (microns)
+!!
+!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! Each mode is to be specified individually and has the following
+!! format (note: a numerical first token signals a new distribution):
+!! 
+!! Nt ; Dbar_g_N ; Rho_g  
+!! Distribution Name
+!!
+!! And then, depending on the flag value, either:
+!!
+!!(if __Flag = 0__): For Sectional Distribution
+!! First Chemical Name  ; Initial Mass Volume Percentage
+!!                  (^^^^^^^ will be normalized, so it doesn't have to add to 100)=
+!! Second Chemical Name ; Initial Mass Volume Percentage
+!! ...
+!!
+!!(or if __Flag = 1__): For Monodisperse or Bulk Distribution
+!! First Chemical Name  ; ug per meter cube of species in distribution
+!! Second Chemical Name ; ug per meter cube of species in distribution
+!! ...
+!!
+!! TO DECLARE BULK MODE, INPUT Nt = 0 AND SPECIFY MASS ABUNDANCE MODE ABOVE
+!! Please remember, composition must be in ug/m3, or in total dry mass % (no water)
+!
+!Size is from Seinfeld and Pandis, mass is from Timbavati (Hobbs et al., 2003)
+!
+1000 ; 0.116; 2.0
+Williams
+NH4NO3; 0.0147
+NH4HSO4; 0.5187
+BC; 0.0234
+CPD3; 0.0875
+!IVOC1;  0.0875
+!(NH4)2SO4; 0.006;
+!K2SO4; 0.047;
+!
+!0 ; 0.02; 1.175
+!Lake McKay
+!(NH4)2SO4; 0.006;
+!K2SO4; 0.047;
+!Na2SO4; 0.013;
+!MgSO4; 0.016;
+!Mg(NO3)2; 0.005;
+!MgCl2; 0.009;
+!BC; 0.000001;
+!CPD3; 0.784;
+!MgC2O4; 0.031
+!3200 ; 0.02 ; 1.175
+!RemConMode1 !S&P, p. 430
+!K2SO4; 1.647
+!(NH4)2SO4; 0.40
+!NH4NO3; 1.009
+!BC; 0.5
+!SO10; 6.52
+!
+!2530 ; 0.116 ; 2.0  !1000 ; 0.116 ; 2.0 
+!RemConMode2 !Dp from S&P, p. 430, for Remote Continental
+!K2SO4; 1.647;
+!(NH4)2SO4; 0.40;
+!NH4NO3; 1.009;
+!BC; 0.5;
+!SO10; 6.52;
+!CPD3; 6.133;
+!
+!1 ; 1.8 ; 1.462
+!RemConMode3 !S&P, p. 430
+!K2SO4; 1.647
+!(NH4)2SO4; 0.40
+!NH4NO3; 1.009
+!BC; 0.5
+!SO10; 6.52
+!
+!6700 ; 0.116 ; 1.242 !2900 ; 0.116 ; 1.242
+!RemConMode2 !S&P, p. 430, scaled up to give correct mass
+!K2SO4; 1.647
+!(NH4)2SO4; 0.40
+!NH4NO3; 1.009
+!NH4Cl; 0.01
+!BC; 0.5
+!SO10; 6.52
+!

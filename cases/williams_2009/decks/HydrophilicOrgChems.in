@@ -1,0 +1,72 @@
+!! HydrophilicOrgChems.in
+!! ASP
+!! Matt Alvarado, 2004-2013 (c)
+!! Based on MELAM by Donnan Steele, 2000-2004 (c)
+!!
+!! This is the HYDROPHILIC ORGANIC CHEMICALS INPUT DECK for ASP
+!! that is read in by SetHydrophilicOrgPhaseChemistry() 
+!! in OrgPhaseChemInits.h 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!
+!! Specify the following variables, separating each by a semi-colon and 
+!! including each on a single line for each gas:
+!!	1. NAME (no more than 15 characters): Make sure this is the same
+!!	     as that used in the other chemical input decks
+!!	2. CONSTANT?: Some chemicals will be held fixed, and others allowed
+!!	  to evolve with time.  Put a "1" if evolving, "0" if not
+!!	3. MOLECULAR MASS (g / mole)
+!!      4. DENSITY (g/cm3)
+!!      5. NUMBER of CARBONS per molecule
+!!      6. Kappa (see Petters and Kreidenweis, ACP, 7, 1961, 2007.)
+!!      7. Raoult's Law Activity Coefficient at Infinite Dilution
+!!      8. ACTIVITY COEFFICIENT FLAG
+!!         if 0. - number than follows is the index (starting at 1) 
+!!                 of the compound in unifacparams.h and the 
+!!                 subroutine UNIDRIV
+!!         if 1. - number that follows is a constant 
+!!                 organic activity HENRY'S LAW coefficient (usually 1.0)
+!!         NOTE: It is safest to set these flags the same for all compounds
+!!         considered. Otherwise the UNIFAC compunds are treated as their 
+!!         own solution that doesn't inteact with the constant compounds.
+!!
+!! Use the same name here as in the gas phase chemical input deck to 
+!! assure proper matching between the two 
+!!
+!Molecular Weights from Pun et al. 2002 and Griffin et al. 2005
+!Refractive Index for OC from Jacobson, "Fund. of Atm. Modeling", 2nd ed, p. 303
+POA1	  ;1	;408.0	  ; 1.5 ; 29 ; 0.00; 1.87e15; 0. ; 1.0;	
+POA2	  ;1	;118.0	  ; 1.5 ; 4  ; 0.04; 3.22e0 ; 0. ; 2.0;	
+POA3	  ;1	;216.0	  ; 1.5 ; 12 ; 0.04; 3.52e3 ; 0. ; 3.0;
+POA4	  ;1	;276.0	  ; 1.5 ; 22 ; 0.04; 2.68e10; 0. ; 4.0;
+POA5	  ;1	;412.0	  ; 1.5 ; 30 ; 0.04; 4.30e14; 0. ; 5.0;
+POA6	  ;1	;166.0	  ; 1.5 ; 8  ; 0.04; 1.17e2 ; 0. ; 6.0;
+POA7	  ;1	;284.0	  ; 1.5 ; 18 ; 0.04; 7.51e7 ; 0. ; 7.0;
+POA8	  ;1	;390.0	  ; 1.5 ; 28 ; 0.04; 1.82e14; 0. ; 8.0;
+!
+!SOA1	  ;1	;90.0	  ; 1.5 ; 2  ; 0.04; 1.15e0 ; 0. ; 9.0;
+!SOA2	  ;1	;184.0	  ; 1.5 ; 8  ; 0.04; 3.67e1 ; 0. ;10.0;
+!SOA3	  ;1	;154.0	  ; 1.5 ; 8  ; 0.04; 1.35e2 ; 0. ;11.0;
+!SOA4	  ;1	;186.0	  ; 1.5 ; 9  ; 0.04; 6.85e1 ; 0. ;12.0;
+!SOA5	  ;1	;186.0	  ; 1.5 ; 10 ; 0.04; 1.72e2 ; 0. ;13.0;
+!SOA6	  ;1	;211.0	  ; 1.5 ; 9  ; 0.04; 1.57e4 ; 0. ;14.0;
+!SOA7	  ;1	;178.0	  ; 1.5 ; 10 ; 0.04; 3.08e3 ; 0. ;15.0;
+!SOA8	  ;1	;217.0	  ; 1.5 ; 12 ; 0.04; 1.06e7 ; 0. ;16.0;
+!SOA9	  ;1	;303.0	  ; 1.5 ; 16 ; 0.04; 1.46e7 ; 0. ;17.0;
+!SO10	  ;1	;217.0	  ; 1.5 ; 10 ; 0.04; 2.22e4 ; 0. ;18.0;
+!
+LEVO	;1	;162.1	  ; 1.5 ; 6  ; 0.04; 2.55e0 ; 0. ;19.0;
+CBIO	;1	;324.3	  ; 1.5 ; 12 ; 0.00; 6.85e-1; 0. ;20.0;
+CPD1	;1	;330.3	  ; 1.5 ; 18 ; 0.04; 8.33e7 ; 0. ;21.0;
+CPD2	;1	;332.4	  ; 1.5 ; 19 ; 0.04; 3.50e4 ; 0. ;22.0;
+CPD3	;1	;730.7	  ; 1.5 ; 36 ; 0.04; 9.43e5 ; 0. ;23.0;
+!
+IVOC1   ;1      ;524.0    ; 1.5 ;  10 ;0.04; 1.00e7 ; 1. ; 1.0;
+IVOC2   ;1      ;479.0    ; 1.5 ;  10 ;0.04; 1.00e7 ; 1. ; 1.0;
+IVOC3   ;1      ;434.0    ; 1.5 ;  10 ;0.04; 1.00e7 ; 1. ; 1.0;
+IVOC4   ;1      ;389.0    ; 1.5 ;  10 ;0.04; 1.00e7 ; 1. ; 1.0;
+IVOC5   ;1      ;344.0    ; 1.5 ;  10 ;0.04; 1.00e7 ; 1. ; 1.0;
+IVOC6   ;1      ;299.0    ; 1.5 ;  10 ;0.04; 1.00e7 ; 1. ; 1.0;
+IVOC7   ;1      ;254.0    ; 1.5 ;  10 ;0.04; 1.00e7 ; 1. ; 1.0;
+IVOC8   ;1      ;208.0    ; 1.5 ;  10 ;0.04; 1.00e7 ; 1. ; 1.0;
+IVOC9   ;1      ;163.0    ; 1.5 ;  10 ;0.04; 1.00e7 ; 1. ; 1.0;
+!

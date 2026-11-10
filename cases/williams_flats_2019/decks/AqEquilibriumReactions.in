@@ -1,0 +1,95 @@
+!! AqEquilibriumReactions.in
+!! ASP
+!! Matt Alvarado, 2004-2013 (c)
+!! Based on MELAM by Donnan Steele, 2000-2004 (c)
+!!
+!! This Input Deck Details the Aqueous Phase Electrolytic Equilibria. !!
+!! that is read in by SetAqPhaseChemistry() in AqPhaseChemistry.h     !!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!
+!! Make another input deck which has stuff related to the 
+!! activities of each of the ions
+!! Flag is 0 if LHS electrolyte is liquid, 1 if it is solid 
+!!
+!! The input file has three columns, separated by semi-colons :
+!!   1). The Equiliribum Reaction (put Electrolyte on Left Hand Side)
+!!   2). Keq(298K)  (The equilibrium coefficient at the reference temperature)  -- in mol/kg (for aq) units)
+!!                  (if this is "Infinite", then the model condenses directly into ions, no aqueous phase)
+!!                  (think: sulfuric acid.)
+!!   3). - DeltaH0 / R T0  (One coefficient of temperature dependence for Keq)
+!!   4). - DeltaCp0 / R    (The other coefficient of temperature dependence for Keq)
+!!   5). First Density Parameter (linear term) for the dissociated form of the electrolyte (if electrolytic, 
+!!        otherwise 0).
+!!   6). Second Density Parameter (exponential term) (again, zero if non electrolytic)
+!!   7). Surface Tension saturation surface excess (mol / m2) 
+!!   8). Surface Tension equilibrium adsorption coefficient (K, dimensionless)
+!!   9). Deliquesence Relative Humidity @ 298 K
+!!  10). Temperature dependence of DRH (-18*m_si*L_si/1000/R)
+!!
+!! A sample line looks like:
+!!    NH4Cl     <=> NH4+  & Cl-    ; inf       ; 0.     ; 0.    ; 1.190     ; 0.0717   ; -1.01e-6 ; 1.30 ; 0.7710 ; 239.0
+!!
+!! In the Equiliribum Reaction:
+!! Please use H2O for water, H+ for protons, and an ampersand
+!! to separate species.
+!!
+!! Surface tension taken from Li and Lu
+!! Density fit using data (Lobo, 1989) and excel or origin
+!!    Reaction               ;Flag   ; Keq       ; K(t1)   ; K(t2)   ;  Density 1 & 2       ; Surf Tension 1 & 2 	; DRH(298K); DRH Temp. Dependence
+!! -----------------------------------------------------------------------------------------------------------------
+H2O	  <=> H+    & OH-      ;0      ; 1.010e-14 ; -22.52  ; 26.92   ; 0.        ; 0.       ; 0.       ; 0.		; 0.		; 0.!
+HCl	  <=> H+    & Cl-      ;0      ; inf       ; 0.      ; 0.      ; 1.382     ; 0.0416   ; 4.12e-7  ; 4.68e-3	; 0.		; 0.!
+H2SO4	  <=> 2 H+  & SO4--    ;0      ; inf       ; 0       ; 0       ; 1.696     ; 0.0906   ; -6.75e-8 ; 1.65e3	; 0.		; 0.!
+HSO4-   <=> H+    & SO4--    ;0      ; 0.01015   ; 8.85    ; 25.14   ; 1.696     ; 0.0906   ; -6.75e-8 ; 1.65e3	; 0.		; 0.!
+NH3 & H2O <=> NH4+  & OH-    ;0      ; 1.805e-5  ; -1.50   ; 26.92   ; 1.540     ; -0.110   ; 0.       ; 0.		; 0.		; 0.!
+HNO3	  <=> H+    & NO3-     ;0      ; inf       ; 0.      ; 0.      ; 1.455     ; 0.0702   ; 8.05e-7  ; 1.06e-1	; 0.		; 0.!
+!CO2 & H2O <=> 2 H+ & CO3--   ;0      ;2.012e-17  ; -9.073  ; 70.658  ; 0.        ;0.        ;0.        ;0.        ; 0.        ; 0.!
+!HCO3-    <=> H+ & CO3--      ;0      ;4.678e-11  ; -5.9908 ; 38.8440 ; 0.        ;0.        ;0.        ;0.        ; 0.        ; 0.;!                       
+!
+!Data for Solid/ion eq. from Jacobson 2005, pp. 741-743
+!Updated as needed using Fountoukis and Nenes, ACP, 2007, ISORROPIA II (MJA, 08-22-2012)
+!Keq in units of mol2/kg2, mol3/kg3 or mol5/kg5
+KCl       <=> K+    & Cl-    ;1      ; 8.680     ; -6.167  ; 19.953 ; 2.512     ; 0.0278   ; -7.31e-7 ; 4.16      ; 0.8426	; 158.9!
+KNO3      <=> K+    & NO3-   ;1      ; 8.72e-1   ; -14.075 ; 19.388   ; 1.746     ; 0.0138   ; -2.38e-6 ; 1.02      ; 0.9248	; 0.0!
+KOH       <=> K+    & OH-    ;1      ; inf       ; 0.     ; 0.      ; 1.751     ; 0.0664   ; -5.44e-7 ; 8.00	; 0.		; 0.!
+K2SO4     <=> 2 K+  & SO4--  ;1      ; 1.569e-2  ; -9.589 ; 45.807   ; 1.884     ; 0.0151   ; -7.05e-6 ; 9.58      ; 0.9751	; 35.6!
+KHSO4     <=> K+    & HSO4-  ;1      ; 2.4016e1  ; -8.423 ; 17.964  ; 0.        ; 0.       ; 0.       ; 0.        ; 0.8600	; 0.0!
+NH4Cl     <=> NH4+  & Cl-    ;1      ; 2.259e1    ; -5.95   ; 16.92   ; 1.190     ; 0.0717   ; -1.01e-6 ; 1.30 	; 0.7710	; 239.0!
+NH4NO3    <=> NH4+  & NO3-   ;1      ; 1.486e1    ; -10.36 ; 17.56   ; 1.353     ; 0.0812   ; -3.08e-6 ; 4.89e-1   ; 0.6138    ; 852.0!
+(NH4)2SO4 <=> 2 NH4+ & SO4-- ;1      ; 1.817     ; -2.65  ; 38.57   ; 1.361     ; 0.198    ; -8.79e-7 ; 3.84e1    ; 0.7997	; 80.0! 
+NaCl	    <=> Na+   & Cl-    ;1    ; 3.766e1   ; -1.56  ; 16.90   ; 1.728     ; 0.0517   ; -1.05e-6 ; 1.20	; 0.7528	; 25.0!
+Na2SO4   <=> 2 Na+ & SO4--   ;1      ; 4.799e-1  ; 0.98   ; 39.75   ; 1.557     ; 0.230    ; -8.37e-7 ; 7.57e1	; 0.9300	; 80.0!
+NaNO3    <=> Na+   & NO3-    ;1      ; 1.197e1     ; -8.22  ; 16.01   ; 1.732     ; 0.0715   ; -1.66e-6 ; 1.25	; 0.7379	; 304.0!
+NaOH     <=> Na+   & OH-     ;1      ; inf       ; 0.     ; 0.      ; 1.602     ; 0.0648   ; -1.13e-6 ; 1.17	; 0.		; 0.!
+NH4HSO4   <=> NH4+  & HSO4-  ;1      ; 1.38e2    ; -2.87  ; 15.83   ; 3.204     ; 0.0176   ; 0.       ; 0.		; 0.4000	; 384.0!
+NaHSO4   <=> Na+   & HSO4-   ;1       ; 2.413e4    ; 0.79  ; 14.75   ; 0.       ; 0.       ; 0.       ; 0.		; 0.5200	; -45.0!
+(NH4)3H(SO4)2 <=> 3 NH4+ & HSO4- & SO4-- ; 1; 2.972e1 ; -5.19 ; 54.40 ; 0.       ; 0.       ; 0.       ; 0.		; 0.6900	; 186.0!
+!
+!Magnesium/Calcium (See Kim 1995 for data)
+!Updated as needed using Fountoukis and Nenes, ACP, 2007, ISORROPIA II (MJA, 08-22-2012)
+MgCl2  <=> Mg++ & 2 Cl-     ;1       ;9.557e21   ;-1.347  ; 0.      ; 1.6783 ; 0.1120       ; -2.49e-7 ; 2.27e2	; 0.328412	; 42.23!
+Mg(NO3)2 <=> Mg++ & 2 NO3-  ;1       ;2.507e15   ;-8.754  ; 0.      ; 1.7694 ; 0.1412       ; 0.       ; 0.	      ; 0.54	; 230.2!
+MgSO4   <=> Mg++ & SO4--    ;1       ;1.079e5    ; 36.798 ; 0.      ; 1.8675 ; 0.1387       ; -1.25e-4 ; 3.79	; 0.8613	; -714.5!
+Mg(OH)2 <=> Mg++ & 2 OH-    ;1       ; inf       ; 0.     ; 0.      ; 0.     ; 0.           ; 0.       ; 0.	      ; 0.		; 0.!
+Mg(HSO4)2 <=> Mg++ & 2 HSO4- ;1      ; inf       ; 0.     ; 0.      ; 0.     ; 0.           ; 0.       ; 0.	      ; 0.		; 0.!
+CaCl2  <=> Ca++ & 2 Cl-     ;1       ;7.974e11   ;-14.078 ; 0.      ; 1.8259 ; 0.1079       ; -4.88e-7 ; 15.0	; 0.2830	; 551.1!
+Ca(NO3)2 <=> Ca++ & 2 NO3-  ;1       ; 6.067e5   ;-11.299     ; 0.      ; 1.9590 ; 0.1128       ; 0.      ; 0.	      ; 0.4906	; 509.4!
+CaSO4*2H2O   <=> Ca++ & SO4-- & 2 H2O ;1 ;4.319e-5 ; 0.   ; 0.9978  ; 0.2242 ; 0.           ; 0.      ; 0.	      ; 0.97	; 0.!
+Ca(OH)2 <=> Ca++ & 2 OH-    ;1       ; inf       ; 0.     ; 0.      ; 0.     ; 0.           ; 0.      ; 0.	      ; 0.		; 0.!
+Ca(HSO4)2 <=> Ca++ & 2 HSO4- ;1      ; inf       ; 0.     ; 0.      ; 0.     ; 0.           ; 0.      ; 0.	      ; 0.		; 0.!
+!
+!Carbonates (see Meng et al., 1995 for data)
+!NaHCO3  <=> Na+ & HCO3-   ;1        ;0.3914     ; -7.5439 ; -5.6796 ; 1.1773  ; 0.3818      ;0.       ;0.         ;0.964      ; 47.4                                                      
+!KHCO3  <=> K+ & HCO3-     ;1        ;13.99      ; -7.5964 ; -2.5210 ; 1.4356  ; 0.1493      ;0.       ;0.         ;1.0        ; 0.                                                       
+!Na2CO3 <=> 2 Na+ & CO3--  ;1		;18.11      ; 10.7713 ; 30.5533 ; 1.6177  ; 0.1728      ;0.       ;0.         ;0.897697   ; -198.0                                                      
+!K2CO3 <=> 2 K+ & CO3--    ;1        ;2.541e5    ; 12.4575 ; 36.7272 ; 1.6816  ; 0.1749      ;0.       ;0.         ;0.444778   ; -557.0                                                      
+!NH4HCO3 <=> NH4+ & HCO3-  ;1        ; 1.08      ; -10.04  ; 0.      ; 1.2959  ; 0.1235      ;0.       ;0.         ;1.0        ; 0.                                                       
+!(NH4)2CO3 <=> 2 NH4+ & CO3-- ; 1    ; inf       ; 0.     ; 0.       ; 1.2185  ; 0.1889      ;0.       ;0.         ;0.0        ; 0.                                                            
+!Mg(HCO3)2   <=> Mg++ & 2 HCO3- ; 1  ; inf       ; 0.     ; 0.       ; 0.      ; 0.          ;0.       ;0.         ;0.0        ; 0.                                                            
+!MgCO3      <=> Mg++ & CO3--  ;1     ;6.812e-6   ;0. 	   ;0.        ; 0.      ; 0.          ;0.       ;0.         ;1.0        ; 0.                                                       
+!Ca(HCO3)2  <=> Ca++ & 2 HCO3- ; 1   ; inf       ; 0.     ; 0.       ; 0.      ; 0.          ;0.       ;0.         ;0.0        ; 0.                                                            
+!CaCO3      <=> Ca++ & CO3--  ;1     ;4.959e-9   ;0.      ; 0.       ; 0.      ; 0.          ;0.       ;0.         ;1.0        ; 0.           
+!
+!Not included!
+!SO2 & H2O <=> 2 H+ & SO3--  ;0     ;1.024e-9   ; 10.78  ; 0.0      ; 0.       ;0.          ;0.        ;0.        ;0.         ; 0.
+!HSO3-    <=> H+ & SO3--   ;0       ;5.99e-8    ; 3.74   ; 0.0      ; 0.       ;0.          ;0.        ;0.        ;0.         ; 0.

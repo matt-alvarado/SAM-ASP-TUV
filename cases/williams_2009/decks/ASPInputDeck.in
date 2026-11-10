@@ -1,0 +1,95 @@
+!! ASPInputDeck.in
+!! Main Input Deck of ASP
+!! Matt Alvarado, 2004-2013 (c)
+!! Based on MELAM by Donnan Steele, 2000-2004 (c)
+!! The ordering of the inputs must be kept constant (as in all
+!! input decks) although the formatting is not as important.  Use 
+!! exclamation points to indicate comments (may head or trail lines).
+!! All other input decks may be stored in a subdirectory, 
+!! note that directory, relative or absolute positioning, here.
+!!
+!!
+!!*******************************************************************
+!!SECTION 1. PROCESS CONTROL SETTINGS
+!!
+!!Here we decide which processes (gas-phase chemistry, condensation, 
+!!coagulation, etc.) are modeled and how they are calculated.
+!!1.a. CHEMISTRY 
+!! Which phases have (kinetic) chemical reactions?
+!! Use 1 for yes, 0 for no,
+!! in this format:
+!! (gas phase chemistry) ; (aqueous phase chemistry) 
+1 ; 0  !! Gas ; Aqueous 
+!!1.b. AEROSOLS 
+0       !! Monodisperse (1 is yes (monodispersion of mean size), 0 is sampled from a distribution)
+!!1.c. CONDENSATION/DISSOLUTION/THERMODYNAMICS
+1	!! Include Condensation? (1 = yes, 0 = no)
+1 	!! Include Dissolution of Inorganic Species?
+1	!! Include Dissolution of Organic Species into Hydrophobic Phase?
+1	!! Include Dissolution of Organic Species into Aqueous Phase?
+1	!! Is Dissolution an Equilibrium (0) or Flux (1) process?
+0	!! Is Ammonia Dissolution an Equilibrium (0) or Flux (1) process?
+0	!! Is Aerosol Metastable (1) or do solid salts form (0)? 
+0       !! Ignore diffusivity corrections (1) or include them (0)? (Also sets curvature corrections to 1.0!)
+!!1.d. COAGULATION
+1       !! Include Coagulation?
+0	!! Is the Coagulation Kernel calculated (0) or constant (1)?
+!!**************************************************************************
+!!
+!!**************************************************************************
+!!SECTION 2. RUN CONTROL SETTINGS
+!!
+!!Here we decide between a Langrangian parcel run, Eulerian box run, smog
+!!chamber run, or other special run formats.
+!!
+1       !!Lagrangian Parcel Model (1 = yes, 0 = no)
+0       !!Eulerian Box Model (1 = yes, 0 = no)
+0       !!Smog Chamber Model (1 = yes, 0 = no)
+0       !!Optical Properties Model (1 = yes, 0 = no)
+0       !!Thermodynamics test to compare to ISORROPIA (1 = yes, 0 = no)
+0       !!Coagulation Test to compare to analytic solution
+0       !!Condensation Test to compare to analytic solution
+0       !!Subroutine settings (for inclusion in larger model)
+!!*************************************************************************
+!!
+!!*************************************************************************
+!!SECTION 3. RUN PARAMETERS
+!!
+!!Here we set temperature, pressure, RH, and other parameters needed
+!!for the run types given above
+!! 3.a GENERAL
+!! Specify the environmental parameters as a single homogeneous
+!! value (numerical)
+288.4   !! Temperature (K)
+880   !! Pressure    (mb)
+0.157   !! Initial Relative Humidity (between 0 and 1)
+0.157   !! Background Relative Humidity (between 0 and 1)
+!! PHOTO FLAG - If 0, run from starting time below for run length
+!!                    following profile in PhotoRates.in
+!!              If 1, linearly interpolate photolysis rates
+!!                    between starting and ending time below
+0      !! PHOTO FLAG
+19.0000   !! Starting Time for Photolysis (h UTC to match PhotoRates.in)
+!!***Below only used if PHOTO FLAG = 1
+5.0    !! Ending Time for Photolysis (h UTC to match PhotoRates.in)
+!!***Above only used if PHOTO FLAG = 1
+300   !! Run Length in minutes
+60.0    !! Chemistry Time Step in s
+60.0    !! Mixing Time Step in s
+60.0   !! Condensation Time Step in s
+60.0   !! Coagulation Time Step in s
+1.0    !! Inversion height in km (for deposition calcs)
+1      !! Include aerosols? (1 for yes, 0 for no)
+2.34e+06   !! Hetero number conc. (cm^-3) (for bulk aero or gas chem only)
+0.05   !! Hetero radii (in um) (for bulk aero or gas chem only)
+!! 3.b For Lagrangian Parcel Model
+106.8735   !! Mixing parameter for Lagrangian parcel (yo^2/4/Ky, units of s)
+!! 3.c For Eulerian Box Model (Currently doesn't work)
+ 5.0     !! Wind Speed for Eulerian Box (m/s)
+50.0     !! Downwind dimensions in km
+50.0     !! Crosswind dimensions in km
+40.0     !! Fire CO emissions in kg/s (used to scale all other emissions)
+!! 3.d To turn off lights
+0    !! If we are doing a chamber on/off lamp thing (0 = normal photo, 1 = use criteria below)
+75   !! When to turn on lights in minutes
+360   !! When to turn off lights in minutes

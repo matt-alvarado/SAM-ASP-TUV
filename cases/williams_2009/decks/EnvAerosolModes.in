@@ -1,0 +1,53 @@
+!! Donnan Steele 
+!! MELAM -- (c) 2001-2004
+!! Updated by Matt Alvarado, 2004-2012
+!!
+!! This input deck specifies the traits of aerosol distributions
+!! from which the particles are to be sampled for the ENVIRONMENTAL aerosol
+!! (that is, not the initial aerosol in the plume).
+!! 
+!! These should be dry particle values, since the resulting particles
+!! will be allowed to reach equilibrium with the ambient water as an
+!! initializing first step of the model.
+!!
+!!  NOTE: The sectional parameters are assumed to be the same as in AerosolModes.in
+!!  Also, if you choose monodisperse or bulk aerosol, that holds here as well.
+!!
+!!   Nt is the total number of particles (particles per cc)
+!!   Dbar_g_N geometric mean diameter (number median diameter) (microns)
+!!   Rho_g Standard Deviation (microns)
+!!
+!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! Each mode is to be specified individually and has the following
+!! format (note: a numerical first token signals a new distribution):
+!! 
+!! Nt ; Dbar_g_N ; Rho_g  
+!! Distribution Name
+!!
+!! And then, depending on the flag value, either:
+!!
+!!(if __Flag = 0__): For Sectional Distribution
+!! First Chemical Name  ; Initial Mass Volume Percentage
+!!                  (^^^^^^^ will be normalized, so it doesn't have to add to 100)=
+!! Second Chemical Name ; Initial Mass Volume Percentage
+!! ...
+!!
+!!(or if __Flag = 1__): For Monodisperse or Bulk Distribution
+!! First Chemical Name  ; ug per meter cube of species in distribution
+!! Second Chemical Name ; ug per meter cube of species in distribution
+!! ...
+!!
+!! TO DECLARE BULK MODE, INPUT Nt = 0 AND SPECIFY MASS ABUNDANCE MODE ABOVE
+!! Please remember, composition must be in ug/m3, or in total dry mass % (no water)
+!
+!Size is from Seinfeld and Pandis, mass is from Timbavati (Hobbs et al., 2003)
+!
+!! Williams background aerosol from Table S4 of the ACP 2015 supplement (ug/m3 of ions converted to salts:
+!! NH4:SO4 = 1:1 so sulfate is NH4HSO4; remaining nitrate is NH4NO3).  Size is NOT given in the paper: remote-continental mode of Seinfeld and Pandis used as for Timbavati.
+1000 ; 0.116 ; 2.0
+Williams background;
+NH4HSO4; 7.913
+NH4NO3; 0.2246
+BC; 0.357
+CPD3; 1.335

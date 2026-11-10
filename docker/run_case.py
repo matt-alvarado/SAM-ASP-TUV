@@ -19,6 +19,9 @@ Every setting can be given as an option or as an environment variable
   --dt / DT                SAM time step (s), default 8
   --case / CASE            case name, default "fire"
   --output / OUTPUT_DIR    where results go, default /output (mount it)
+  --set NAME=VALUE / SAM_SET="NAME=VALUE;NAME=VALUE"
+                           extra SAM &PARAMETERS settings for the case's prm
+                           (Fortran syntax, e.g. perturb_type=2); --set may repeat
   --era5-pl / ERA5_PL_FILE, --era5-sl / ERA5_SL_FILE
                            use these ERA5 netCDF files (pressure levels,
                            single levels) instead of downloading
@@ -68,6 +71,7 @@ def main(argv=None):
     ap.add_argument('--output', default=env('OUTPUT_DIR', '/output'))
     ap.add_argument('--era5-pl', default=env('ERA5_PL_FILE'))
     ap.add_argument('--era5-sl', default=env('ERA5_SL_FILE'))
+    ap.add_argument('--set', action='append', default=[], metavar='NAME=VALUE')
     a = ap.parse_args(argv)
 
     missing = [n for n, v in (('lat/LAT', a.lat), ('lon/LON', a.lon), ('date/DATE', a.date),
@@ -97,6 +101,7 @@ def main(argv=None):
         sets.append('nstat=%d' % nstop)
     if a.fire_start_step is not None:
         sets.append('fire_nstep_start=%d' % a.fire_start_step)
+    sets += [s.strip() for s in (env('SAM_SET') or '').split(';') if s.strip()] + a.set
     cmd = [sys.executable, os.path.join(MODEL, 'create_run.py'), '--case', a.case,
            '--lat', str(a.lat), '--lon', str(a.lon), '--time', '%sT%s' % (a.date, a.start),
            '--massemis', repr(a.massemis), '--dt', repr(a.dt), '--hours', repr(a.hours),

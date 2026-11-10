@@ -23,6 +23,9 @@ the old input file format. Tests (offline): `python3 -m unittest discover -s tes
 
 ## Running in a container
 
+Prepared fire cases (Williams Flats 2019, Williams 2009, BBOP 2013) are in
+[cases/](cases/README.md): `docker run ... --env-file cases/<case>/case.env sam-asp-tuv`.
+
 See [docs/Container_User_Guide.md](docs/Container_User_Guide.md) for the full
 guide (settings, ASP decks, ERA5, outputs, troubleshooting, and running on AWS),
 and [docs/OnPrem_RHEL_CMMC_Guide.md](docs/OnPrem_RHEL_CMMC_Guide.md) for an on-prem
@@ -55,6 +58,7 @@ Run a case, with the ASP input decks and an output directory mounted:
 | fire start (spin-up) step | `FIRE_START_STEP` | default 1080 |
 | time step (s), case name | `DT` (8), `CASE` (fire) | |
 | ERA5 | `CDSAPI_KEY`, or mount `/root/.cdsapirc`, or `ERA5_PL_FILE` + `ERA5_SL_FILE` (mounted files) | |
+| extra SAM namelist settings | `SAM_SET="NAME=VALUE;..."` (`--set NAME=VALUE`) | |
 
 The deck directory must hold a full SAM-ASP deck set (`ASPInputDeck.in`,
 `GasPhaseChems.in`, `GasChemicalMechanism.in`, `PhotoRates.in`, `PhotoMap.in`,

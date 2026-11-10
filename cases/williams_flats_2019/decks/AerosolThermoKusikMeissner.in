@@ -1,0 +1,63 @@
+!! AerosolThermoKusikMeissner.in
+!! ASP
+!! Matt Alvarado, 2004-2013 (c)
+!! Based on MELAM by Donnan Steele, 2000-2004 (c)
+!! This Input Deck Details the thermodynamic Kusik-Meissner data for  !!
+!! the available electrolytes.					      !!
+!!								      !!
+!! If a particular electrolyte is not listed here but is listed in the!!
+!! AqEquilibriumReactions.in, MELAM will try to figure a composite    !!
+!! of the avaialable activity coefficients and will inform you of what!!
+!! it decides.							      !!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!
+!! The input file has three columns, separated by semi-colons :
+!!   1). The Equiliribum Reaction (put Electrolyte on Left Hand Side)
+!!   2). q_r (for Kusik and Meissner calculation)
+!!   3). q_T (             "  "                 )
+!!
+!! A sample line looks like:
+!!    H2SO4 <=> SO4-- & 2 H+ ; -0.10 ; -0.0027
+!!
+!! In the Equiliribum Reaction:
+!! Please use H2O for water, H+ for protons, and an ampersand
+!! to separate species.
+!!
+!!    Reaction             ;  q_r   ;   q_T   
+!! ------------------------------------------
+!! 
+!!Updated as needed using Fountoukis and Nenes, ACP, 2007, ISORROPIA II (MJA, 08-22-2012)
+H2SO4	  <=> 2 H+  & SO4--  ; -.10   ; -0.0027 
+HSO4-	  <=> H+    & SO4--  ; 8.00   ; -0.0027 
+H2SO4	  <=> H+    & HSO4-  ; 8.00   ; -0.0027
+HNO3	  <=> H+    & NO3-   ; 2.6    ; -0.0027
+HCl	  <=> H+    & Cl-    ; 6.00   ; -0.0027
+NH4NO3    <=> NH4+  & NO3-   ; -1.15  ; -0.0027
+(NH4)2SO4 <=> 2 NH4+ & SO4-- ; -0.25  ; -0.0027
+NH4Cl     <=> NH4+   & Cl-   ; 0.82   ; -0.0027
+NaCl	  <=> Na+   & Cl-    ; 2.23   ;  0.00707
+Na2SO4   <=> 2 Na+ & SO4--  ; -0.19  ; -0.0027
+NaOH      <=> Na+    & OH-   ; 3.00   ; -0.0027
+NaNO3     <=> Na+   & NO3-   ; -.39   ; -0.0027
+KOH       <=> K+     & OH-   ; 4.77   ; -0.0027
+KCl       <=> K+     & Cl-   ; 0.92   ; -0.0027
+KNO3      <=> K+    & NO3-   ; -2.33  ; -0.0027
+K2SO4     <=> 2 K+  & SO4--  ; -0.25  ; -0.0027
+!
+MgCl2  <=> Mg++ & 2 Cl-     ;2.90       ;-0.0027
+Mg(NO3)2 <=> Mg++ & 2 NO3-  ;2.32       ;-0.0027
+MgSO4   <=> Mg++ & SO4--    ;0.15       ;-0.0027
+Ca(NO3)2 <=> Ca++ & 2 NO3-  ;0.93      ; -0.0027
+CaCl2  <=> Ca++ & 2 Cl-     ;2.40      ;-0.0027
+!Carbonate Reactions
+!Na2CO3 <=> 2 Na+ & CO3--   ; 0.00177 ; -0.0027 !Kim 1995
+!K2CO3 <=> 2 K+ & CO3--   ; 0.00177 ; -0.0027 !Kim 1995
+!NaHCO3  <=> Na+ & HCO3-    ; -1.9974 ; -0.0027 !Kim 1995
+!KHCO3  <=> K+ & HCO3-    ; -1.3162 ; -0.0027 !Kim 1995
+!NH4HCO3 <=> NH4+ & HCO3- ; -1.9974 ; -0.0027 !Kim 1995
+!CO2 & H2O <=>  2 H+  & CO3--  ; 0.   ; 0.
+!HCO3-	  <=> H+    & CO3--  ; 0.   ; 0.
+!CO2 & H2O <=>  H+  & HCO3-  ; 0.   ; 0.
+!SO2 & H2O <=>  2 H+  & SO3--  ; 0.   ; 0.
+!HSO3-	  <=> H+    & SO3--  ; 0.   ; 0.
+!SO2 & H2O <=>  H+  & HSO3-  ; 0.   ; 0.

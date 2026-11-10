@@ -1,0 +1,57 @@
+!! Dissolution.in
+!! ASP
+!! Matt Alvarado, 2004-2006 (c)
+!! Based on MELAM by Donnan Steele, 2000-2004 (c)
+!!
+!! This is the INORGANIC DISSOLUTION REACTION INPUT DECK for MELAM
+!! read by the subroutine SetDissolution() in CondensationInitialization.h
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!
+!! The following is the full list of gases tracked in the gas phase 
+!! (water vapor and H2SO4 are hard coded and should not be included here)
+!
+!! Specify the following variables, separating each by a semi-colon and 
+!! including each on a single line for each gas:
+!!	REACTION (each no more than 15 characters): Make sure this is the same
+!!	          as that used in the other chemical input decks
+!!
+!!         can put just a single chemical name if it is a direct dissolution
+!!         process.  For example "H2O2"
+!!
+!!         if a single gas phase chemical goes directly into ionic form in solution
+!!         (HNO3 is a good example), the only put HNO3 here and then place a reaction
+!!         in AqEquilibriumReactions.in for HNO3 that is infinitely dissociating ("inf")
+!!
+!!         If it is a gas-solid reaction, you can write this in reaction form 
+!!         with a single aqueous species on the right :
+!!
+!!             NH3 & HNO3 <=> NH3HNO3
+!!
+!!         Note that you may get errors in NH3 is not the first compound on the left
+!!
+!! 	     Ammonia can also have an ion on the left:
+!!	     NH3 & H+ <=> NH4+
+!!	     Please don't try this with other species without updating the source code.
+!!
+!!    MASS ACCOMMODATION COEFFICIENT: A positive value
+!!
+!!	HENRY'S LAW COEFF's: two elements: H298(mol kg-1 atm-1, or (mol kg-1)2 atm-1 or atm-1) 
+!!    and two temperature dependence terms (see Jacobson, 2nd ed., pp. 741-743)
+!!
+!! Use the same name here as in the gas phase chemical input deck to 
+!! assure proper matching between the two
+!
+! Reaction           		; Mass Acc ; H(1)     ; H(2)  ; H(3)
+!NOTE: The reactions MUST be in this order!
+!Updated as needed using Fountoukis and Nenes, ACP, 2007, ISORROPIA II (MJA, 08-22-2012)
+HCl  <=> H+ & Cl-    		;  0.064   ; 1.971e6  ; 30.20 ; 19.91;
+NH3 & H+  <=> NH4+   		;  0.04    ; 1.031e11  ; 34.86 ; -5.39;
+NH3                  		;  0.04    ; 57.64    ; 13.79 ; -5.39;
+HNO3 <=> H+ & NO3-   		;  0.054   ; 2.511e6  ; 29.17 ; 16.83;
+!
+!Units 1/atm2: Always put ammonia first!
+NH3 & HCl <=> NH4Cl     ;  0.04    ; 9.2081e15  ; 71.00; -2.40;
+NH3 & HNO3 <=> NH4NO3    ;  0.04   ; 2.38152e16  ; 74.375; -6.025;
+!
+!CO2					; 0.04     ; 3.41e-2  ; 8.19 ; -28.93
+!SO2                           ; 0.04     ; 1.22     ; 10.55 ; 0.

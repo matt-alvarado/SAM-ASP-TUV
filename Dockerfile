@@ -8,6 +8,8 @@
 #   docker build -t sam-asp-tuv .
 # Options:
 #   --build-arg NSUBDOMAINS_X=8   MPI ranks (subdomains in x; must divide 240)
+#   --build-arg NTRACERS=4096     SAM tracer count for decks other than the default
+#                                 (the model prints the value a deck set needs)
 #   --secret id=ca,src=ca.crt     extra CA certificate, for building behind a
 #                                 TLS-intercepting proxy (used during the build only)
 
@@ -51,11 +53,13 @@ RUN printf '%s\n' \
 WORKDIR /opt/sam-asp-tuv
 COPY . .
 ARG NSUBDOMAINS_X=16
+ARG NTRACERS=
 RUN test -f SRC_TUV/ASP/src/StepASP4SAM.f90 || \
         { echo 'ASP source missing: run "git submodule update --init" before docker build'; exit 1; } && \
     nx=$(sed -n 's/.*nx_gl *= *\([0-9]*\).*/\1/p' SRC_TUV/domain.f90 | head -1) && \
     [ $((nx % NSUBDOMAINS_X)) -eq 0 ] || { echo "NSUBDOMAINS_X=$NSUBDOMAINS_X must divide nx_gl=$nx"; exit 1; } && \
     sed -i "s/^\( *integer, parameter :: nsubdomains_x *= *\)[0-9]*/\1${NSUBDOMAINS_X}/" SRC_TUV/domain.f90 && \
+    if [ -n "$NTRACERS" ]; then sed -i "s/^\( *integer, parameter :: ntracers *= *\)[0-9]*/\1${NTRACERS}/" SRC_TUV/domain.f90; fi && \
     ny=$(sed -n 's/.*nsubdomains_y *= *\([0-9]*\).*/\1/p' SRC_TUV/domain.f90 | head -1) && \
     echo $((NSUBDOMAINS_X * ny)) > NRANKS && \
     SAMASP_ENV=/opt/samasp-env.sh ./build_ifx.sh > /tmp/build.out 2>&1 || \

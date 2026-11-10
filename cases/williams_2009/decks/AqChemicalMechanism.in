@@ -1,0 +1,35 @@
+!! AqChemicalMechanism.in
+!! ASP
+!! Matt Alvarado, 2004-2006 (c)
+!! Based on MELAM by Donnan Steele, 2000-2004 (c)
+!! This is the gas phase mechanism input deck for MELAM.
+!! Each chemical must be typed the same way each time, and 
+!! must match one of the chemicals in GasPhaseChems.in
+!! Use + to connote reation, an unreacting M to indicate pressure 
+!! dependence, and => to signify the reactant / product boundary
+!! You can use stoichiometric factors (you must put whitespace
+!! between the factor and the chemical).
+!!
+!! After specifying the reaction, put a semi-colon and specify the
+!! appropriate rate coefficients, delimited by reaction type, 
+!! 
+!! Refer to water as "H2O" - although don't specify it in the chemical lists.
+!!
+!!  For photolytic reactinos, assume that the reaction rate is proportional to 
+!!  concentration.  Additional dependencies may later be added, such as interactive 
+!!  radiation (11/01).  So:
+!!                1. Reaction Rate (sec^-1)
+!!
+!!  Two body Reactions Assume the Arrheneous Form:
+!!	k = A *  exp(-B/T)
+!!  All units are appropriate combinations of moles, cm, seconds, and K.
+!!  So, specify:  1. "A": Reaction Rate at 298 (M^(-n+1) s^-1)
+!!		  2. "B": Temperature Dependence (Ea / R(K))
+!!
+H2SO4 => H2SO4 ; 0.
+!SO2   + O3   => H2SO4  ; 2.4e4; 0.
+!HSO3- + O3   => H2SO4  ; 3.7e5; 5530.
+!SO3-- + O3   => H2SO4  ; 1.5e9; 5280.
+!SO2   + H2O2 => H2SO4  ; 7.5e7; 4430.
+!HSO3- + H2O2 => H2SO4  ; 7.5e7; 4430.
+!SO3-- + H2O2 => H2SO4  ; 7.5e7; 4430.
