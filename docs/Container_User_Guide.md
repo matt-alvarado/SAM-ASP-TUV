@@ -301,10 +301,14 @@ Notes:
 
 - **Tracer count.** SAM allocates one tracer per gas species and per aerosol
   species and size bin. The image is compiled for the default deck's tracer
-  count, and the model stops at start-up with the required value if your
-  decks need a different number. To use decks with a different species list,
-  build the image with `--build-arg NTRACERS=<that value>` (it sets `ntracers`
-  in `SRC_TUV/domain.f90`). The count grows with the number of size bins.
+  count. Before doing anything else (no case files, no ERA5 download), the
+  entry point counts the tracers your decks need and stops with the required
+  value if it differs; SAM checks again at start-up. To check decks without
+  running: `docker run --rm -v ~/samasp/my_decks:/decks:ro sam-asp-tuv
+  --check-decks --decks /decks`. To use decks with a different species list
+  or bin count, build the image with `--build-arg NTRACERS=<that value>` (it
+  sets `ntracers` in `SRC_TUV/domain.f90`). The count grows with the number
+  of size bins.
 - **Size bins.** Use 10 aerosol size bins (as all decks in `cases/`). ASP
   repository decks have 40 bins (4096 tracers, about 2.75 times the work), and
   with 40 bins the Williams deck fails in SAM's sectional coagulation; convert
@@ -708,7 +712,7 @@ EC2 route above; consider it once the EC2 workflow works.
 | The run stops early; `run.out` shows `Segmentation fault` near the start | The stack limit is too small: add `--ulimit stack=-1`. |
 | MPI errors about shared memory or `vader` | Add or increase `--shm-size` (e.g. `--shm-size=2g`). |
 | `forrtl: error (78): process killed (SIGTERM)` at the very end of `run.out` | Harmless: Open MPI stops the other ranks after SAM's normal exit (code 9). The run is complete if it reached its last step. |
-| `ntracers ... does not match` at start-up | Your decks need a different tracer count; see [section 6](#6-asp-input-decks). |
+| `the ASP decks ... need N SAM tracers, but this model was built with ntracers = M` | Your decks need a different tracer count. Rebuild with `--build-arg NTRACERS=N`; see [section 6](#6-asp-input-decks). Nothing was run. |
 | "No space left on device" | Free disk, or mount `/output` on a larger volume. |
 | Very slow run | More ranks than physical cores (check `NRANKS` and the machine), or ASP chemistry in a large plume. See [section 10](#10-performance-and-machine-size). |
 

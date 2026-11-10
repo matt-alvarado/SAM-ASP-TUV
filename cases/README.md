@@ -40,8 +40,9 @@ repository decks have 40 bins; with 40 bins the Williams deck fails in SAM
 decks to 10 bins (the three sectional lines of `AerosolModes.in`) before use.
 
 **Tracer count.** SAM is compiled for one deck layout: `ntracers` in
-`SRC_TUV/domain.f90` must equal the number the decks need (the model stops at
-start-up and prints it otherwise). The default image fits
+`SRC_TUV/domain.f90` must equal the number the decks need. The entry point
+checks this first and stops with the required value before any work (also
+`--check-decks` to check only); SAM checks again at start-up. The default image fits
 `williams_flats_2019`. For `williams_2009`, build an image with
 `--build-arg NTRACERS=1486`, for example tagged `sam-asp-tuv:nt1486`.
 

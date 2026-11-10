@@ -585,3 +585,12 @@ Timings are asptest (30 steps, 16 MPI ranks oversubscribed on this machine).
 - The ASP repository (asp_v2.2.2) gained `WilliamsFlats` decks for the baseline
   and all eight other mechanisms, built from the v1.0.0 decks with the 9-bin
   volatility scheme (`WilliamsFlatsTranslation/`).
+- Tracer pre-check (`docker/run_case.py`): before building the case or
+  downloading ERA5, the entry point counts the tracers the ASP decks need
+  (evolving gases + H2O, then per size bin the aqueous species and ions +
+  water, the organic species + 1 and the aqueous organics, plus one number
+  tracer per bin, as `samasp_layout_init`) and compares them with `ntracers`
+  in `SRC_TUV/domain.f90`; a mismatch stops with the `NTRACERS` value to
+  build with. `--check-decks` checks only. Counts verified against SAM's own
+  layout output: 1488 (Williams Flats), 1486 (Williams 10 bins), 4096
+  (Williams 40 bins); `tests/test_run_case.py`.

@@ -22,11 +22,16 @@ Every setting can be given as an option or as an environment variable
   --set NAME=VALUE / SAM_SET="NAME=VALUE;NAME=VALUE"
                            extra SAM &PARAMETERS settings for the case's prm
                            (Fortran syntax, e.g. perturb_type=2); --set may repeat
+  --check-decks            only check the decks against the model's tracer
+                           count (ntracers) and exit
   --era5-pl / ERA5_PL_FILE, --era5-sl / ERA5_SL_FILE
                            use these ERA5 netCDF files (pressure levels,
                            single levels) instead of downloading
   ERA5 download: set CDSAPI_KEY (your Copernicus CDS key) or mount a
   .cdsapirc at /root/.cdsapirc.
+
+Before any work the decks' SAM tracer count is checked against the model's
+ntracers; a mismatch stops the run with the NTRACERS value to build with.
 
 Outputs in OUTPUT_DIR: OUT_STAT, OUT_3D, OUT_2D, OUT_MOMENTS, OUT_MOVIES,
 RESTART (SAM), ASP/ (ASP output files), case/ (the case's input files,
@@ -56,6 +61,65 @@ def fail(msg):
     sys.exit(2)
 
 
+def _deck_rows(path, skip_flag_line=False):
+    """data rows (';'-separated fields, comments removed) of an ASP deck file"""
+    rows = []
+    for ln in open(path, errors='replace'):
+        s = ln.replace('\r', '').split('!')[0].strip()
+        if s and ';' in s and not s.startswith('END-OF-FILE'):
+            rows.append([f.strip() for f in s.split(';')])
+    return rows[1:] if skip_flag_line else rows
+
+
+def deck_tracers(decks):
+    """SAM tracers the decks need, counted as samasp_layout_init does with ASP's species counts:
+    evolving gases + H2O, then per size bin the aqueous species and ions + water, the organic
+    species + 1, and the aqueous organics, then one number tracer per bin.
+    -> (needed, description), or (None, reason) if it cannot be counted here"""
+    j = lambda f: os.path.join(decks, f)   # noqa: E731
+    gas = sum(1 for r in _deck_rows(j('GasPhaseChems.in'), True) if len(r) > 1 and r[1] == '1') + 1
+    aq = len(_deck_rows(j('AqPhaseChems.in'))) + len(_deck_rows(j('AqPhaseIons.in'))) + 1
+    org = len(_deck_rows(j('OrgPhaseChems.in'))) + 1
+    aqorg = len(_deck_rows(j('HydrophilicOrgChems.in')))
+    vals = [ln.replace('\r', '').split('!')[0].strip() for ln in open(j('AerosolModes.in'), errors='replace')]
+    vals = [v for v in vals if v]
+    if vals[0].upper() not in ('F', '.FALSE.'):
+        return None, 'AerosolModes.in allows Lagrangian particles; the model checks the count at start-up'
+    nbins = int(float(vals[3]))          # flag, mass flag, upper cutoff, number of bins
+    spec = aq + org + aqorg
+    return gas + nbins * (spec + 1), ('%d gases + %d size bins x (%d species + 1 number)'
+                                      % (gas, nbins, spec))
+
+
+def compiled_ntracers():
+    import re
+    for ln in open(os.path.join(MODEL, 'SRC_TUV', 'domain.f90')):
+        m = re.match(r'^\s*integer, parameter :: ntracers\s*=\s*(\d+)', ln)
+        if m:
+            return int(m.group(1))
+    return None
+
+
+def check_tracers(decks, quiet=False):
+    """stop before any work if the decks need a different tracer count than the model was built with"""
+    try:
+        need, how = deck_tracers(decks)
+    except (OSError, ValueError, IndexError) as e:
+        print('WARNING: could not count the tracers of %s (%s); the model checks at start-up' % (decks, e))
+        return
+    have = compiled_ntracers()
+    if need is None or have is None:
+        print('WARNING: tracer count not checked here (%s); the model checks at start-up'
+              % (how if need is None else 'ntracers not found in SRC_TUV/domain.f90'))
+        return
+    if need != have:
+        fail('the ASP decks in %s need %d SAM tracers (%s), but this model was built with ntracers = %d.\n'
+             '       Rebuild the image with --build-arg NTRACERS=%d (or use decks with the same species and '
+             'size bins). Nothing was run.' % (decks, need, how, have, need))
+    if not quiet:
+        print('tracers: %d (%s) = ntracers of this build' % (need, how))
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--lat', type=float, default=env('LAT'))
@@ -72,7 +136,16 @@ def main(argv=None):
     ap.add_argument('--era5-pl', default=env('ERA5_PL_FILE'))
     ap.add_argument('--era5-sl', default=env('ERA5_SL_FILE'))
     ap.add_argument('--set', action='append', default=[], metavar='NAME=VALUE')
+    ap.add_argument('--check-decks', action='store_true')
     a = ap.parse_args(argv)
+
+    if a.check_decks:
+        decks = os.path.abspath(a.decks)
+        absent = [f for f in DECK_FILES if not os.path.isfile(os.path.join(decks, f))]
+        if absent:
+            fail('ASP deck directory %s lacks %s (is it mounted?)' % (decks, ', '.join(absent)))
+        check_tracers(decks)
+        return 0
 
     missing = [n for n, v in (('lat/LAT', a.lat), ('lon/LON', a.lon), ('date/DATE', a.date),
                               ('start/START_TIME', a.start), ('hours/RUN_HOURS', a.hours)) if v is None]
@@ -82,6 +155,7 @@ def main(argv=None):
     absent = [f for f in DECK_FILES if not os.path.isfile(os.path.join(decks, f))]
     if absent:
         fail('ASP deck directory %s lacks %s (is it mounted?)' % (decks, ', '.join(absent)))
+    check_tracers(decks)
     if bool(a.era5_pl) != bool(a.era5_sl):
         fail('give both ERA5_PL_FILE and ERA5_SL_FILE, or neither')
     if not a.era5_pl and not (env('CDSAPI_KEY') or os.path.exists(os.path.expanduser('~/.cdsapirc'))):
