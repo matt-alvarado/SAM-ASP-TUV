@@ -1,0 +1,109 @@
+# syntax=docker/dockerfile:1
+# SAM-ASP-TUV on Red Hat Universal Base Image 9 (RHEL 9), for sites that need
+# the container's operating system to be RHEL 9 (e.g. a CMMC enclave; see
+# docs/OnPrem_RHEL_CMMC_Guide.md). Same model, same entry point and settings
+# as the Ubuntu-based Dockerfile.
+#
+# Build (the common_ASP submodule must be checked out):
+#   git submodule update --init
+#   podman build -f Dockerfile.ubi9 -t sam-asp-tuv .
+# Options:
+#   --build-arg BASE=<image>       RHEL 9 base image, e.g. your organization's
+#                                  hardened UBI 9 (default: Red Hat's UBI 9.8)
+#   --build-arg NSUBDOMAINS_X=8    MPI ranks (subdomains in x; must divide 240)
+#   --secret id=ca,src=ca.pem      extra CA certificates, for building behind a
+#                                  TLS-intercepting proxy (used during the build only)
+#
+# Where things come from:
+#   RHEL 9 (UBI repositories): the OS, Python 3.9, NumPy, requests, OpenSSL.
+#     All network traffic at run time (the ERA5 download) goes through these,
+#     so on a FIPS-mode host it uses RHEL's FIPS-mode OpenSSL.
+#   conda-forge (pinned): Intel ifx/icx compilers and their run-time
+#     libraries, Open MPI, HDF5, NetCDF-C (and tcsh, for the build only).
+#     These are not in the UBI repositories (Open MPI and tcsh are in full
+#     RHEL; HDF5 and NetCDF only in EPEL).
+#   Source, checksummed: NetCDF-Fortran (built with ifx: SAM uses its F90
+#     module); the model itself.
+#   PyPI (pinned): cdsapi, netCDF4, cftime.
+
+ARG BASE=registry.access.redhat.com/ubi9/ubi:9.8
+
+# ---------------------------------------------------------------- toolchain
+FROM ${BASE} AS build
+ARG NETCDF_FORTRAN_URL=https://archive.ubuntu.com/ubuntu/pool/universe/n/netcdf-fortran/netcdf-fortran_4.6.2+ds.orig.tar.xz
+ARG NETCDF_FORTRAN_SHA256=a678b492c78aa6d2b45b87762ff0e474a2d62202497cad62615b47298cc20ebd
+ENV SSL_CERT_FILE=/etc/pki/tls/certs/ca-bundle.crt
+RUN --mount=type=secret,id=ca,required=false \
+    if [ -s /run/secrets/ca ]; then cp /run/secrets/ca /etc/pki/ca-trust/source/anchors/build-ca.pem && update-ca-trust; fi && \
+    dnf -y -q install bzip2 xz make perl m4 diffutils findutils gcc > /dev/null && dnf clean all > /dev/null
+# compilers and libraries (conda-forge, pinned)
+RUN mkdir -p /opt/micromamba && cd /opt/micromamba && \
+    curl -sSL https://conda.anaconda.org/conda-forge/linux-64/micromamba-2.10.0-0.tar.bz2 | tar xj bin/micromamba && \
+    export MAMBA_ROOT_PREFIX=/opt/micromamba && \
+    ./bin/micromamba create -y -q -p /opt/intel-ifx -c conda-forge \
+        ifx_linux-64=2026.2.0 dpcpp_linux-64=2026.2.0 tcsh=6.24.16 && \
+    ./bin/micromamba create -y -q -p /opt/deps -c conda-forge \
+        openmpi=4.1.6 'libnetcdf=4.9.3=nompi*' 'hdf5=1.14.6=nompi*' && \
+    rm -rf /opt/micromamba/pkgs && \
+    ln -s /opt/intel-ifx/bin/tcsh /bin/csh
+# NetCDF-Fortran built with ifx
+RUN B=$(mktemp -d) && cd $B && \
+    curl -sSL -o nff.tar.xz "$NETCDF_FORTRAN_URL" && \
+    echo "$NETCDF_FORTRAN_SHA256  nff.tar.xz" | sha256sum -c - > /dev/null && \
+    tar xJf nff.tar.xz && cd netcdf-fortran-*/ && \
+    PATH=/opt/intel-ifx/bin:$PATH FC=ifx F77=ifx CC=icx CPPFLAGS=-I/opt/deps/include \
+        LDFLAGS="-L/opt/deps/lib -Wl,-rpath,/opt/deps/lib" \
+        ./configure --prefix=/opt/netcdf-ifx --disable-static -q > /dev/null && \
+    cd fortran && PATH=/opt/intel-ifx/bin:$PATH make -j"$(nproc)" -s > /dev/null 2>&1 && make install -s > /dev/null 2>&1 && \
+    cd / && rm -rf $B
+RUN printf '%s\n' \
+    'export PATH=/opt/intel-ifx/bin:/opt/deps/bin:$PATH' \
+    'export LIB_SYS=/opt/deps/lib' \
+    'export INC_MPI=/opt/deps/include LIB_MPI_DIR=/opt/deps/lib' \
+    'export INC_NETCDF=/opt/netcdf-ifx/include LIB_NETCDF_DIR=/opt/netcdf-ifx/lib' \
+    'export LDFLAGS_TOOLCHAIN="-Wl,-rpath,/opt/intel-ifx/lib -Wl,-rpath-link,/opt/intel-ifx/lib -Wl,-rpath-link,$LIB_SYS -Wl,-rpath,$LIB_SYS -Wl,-rpath,/opt/netcdf-ifx/lib"' \
+    > /opt/samasp-env.sh
+
+# ---------------------------------------------------------------- model
+WORKDIR /opt/sam-asp-tuv
+COPY . .
+ARG NSUBDOMAINS_X=16
+RUN test -f SRC_TUV/ASP/src/StepASP4SAM.f90 || \
+        { echo 'ASP source missing: run "git submodule update --init" before the build'; exit 1; } && \
+    nx=$(sed -n 's/.*nx_gl *= *\([0-9]*\).*/\1/p' SRC_TUV/domain.f90 | head -1) && \
+    [ $((nx % NSUBDOMAINS_X)) -eq 0 ] || { echo "NSUBDOMAINS_X=$NSUBDOMAINS_X must divide nx_gl=$nx"; exit 1; } && \
+    sed -i "s/^\( *integer, parameter :: nsubdomains_x *= *\)[0-9]*/\1${NSUBDOMAINS_X}/" SRC_TUV/domain.f90 && \
+    ny=$(sed -n 's/.*nsubdomains_y *= *\([0-9]*\).*/\1/p' SRC_TUV/domain.f90 | head -1) && \
+    echo $((NSUBDOMAINS_X * ny)) > NRANKS && \
+    SAMASP_ENV=/opt/samasp-env.sh ./build_ifx.sh > /tmp/build.out 2>&1 || \
+        { tail -30 /tmp/build.out; tail -40 _build/sam_build.log 2>/dev/null; exit 1; } && \
+    SAMASP_ENV=/opt/samasp-env.sh UTIL/build_util.sh > /dev/null && \
+    rm -rf _build OBJ && \
+    mkdir -p /runtime-libs && \
+    ldd SAM_RAD_CAM_MICRO_M2005_w_aero $(sed -n 's/^\//UTIL\//p' UTIL/.gitignore) | \
+        awk '$3 ~ /^\/opt\/(intel-ifx|netcdf-ifx)\// {print $3}' | \
+        sort -u | xargs -I{} cp --parents -L {} /runtime-libs/ && \
+    rm -rf /opt/deps/include /opt/deps/share/doc /opt/deps/share/man && \
+    find /opt/deps -name '*.a' -delete
+
+# ---------------------------------------------------------------- runtime
+FROM ${BASE}
+ENV REQUESTS_CA_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt
+RUN --mount=type=secret,id=ca,required=false \
+    if [ -s /run/secrets/ca ]; then cp /run/secrets/ca /etc/pki/ca-trust/source/anchors/build-ca.pem && update-ca-trust; fi && \
+    dnf -y -q install python3 python3-numpy python3-requests python3-pip > /dev/null && \
+    pip3 install -q --no-cache-dir cdsapi==0.7.7 netCDF4==1.6.5 cftime==1.6.3 && \
+    dnf -y -q remove python3-pip > /dev/null && dnf clean all > /dev/null && rm -rf /var/cache/dnf && \
+    rm -f /etc/pki/ca-trust/source/anchors/build-ca.pem && update-ca-trust
+COPY --from=build /runtime-libs/opt /opt
+COPY --from=build /opt/deps /opt/deps
+COPY --from=build /opt/sam-asp-tuv /opt/sam-asp-tuv
+ENV SAMASP_HOME=/opt/sam-asp-tuv \
+    PATH=/opt/deps/bin:$PATH \
+    OPAL_PREFIX=/opt/deps \
+    CDSAPI_URL=https://cds.climate.copernicus.eu/api \
+    OMPI_MCA_btl_vader_single_copy_mechanism=none \
+    OMPI_MCA_plm=isolated
+WORKDIR /opt/sam-asp-tuv
+VOLUME ["/output"]
+ENTRYPOINT ["python3", "/opt/sam-asp-tuv/docker/run_case.py"]

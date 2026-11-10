@@ -555,3 +555,15 @@ Timings are asptest (30 steps, 16 MPI ranks oversubscribed on this machine).
   user) and peak memory (about 1.1 GB for 16 ranks). The Dockerfile's base
   image is now fully qualified (`docker.io/library/ubuntu:24.04`) so Podman
   needs no short-name lookup.
+- RHEL 9 container image (`Dockerfile.ubi9`, UBI 9.8; `BASE` build-arg for
+  a hardened UBI 9): OS, Python 3.9, NumPy, requests and OpenSSL from RHEL;
+  Intel ifx/icx 2026.2.0, Open MPI 4.1.6, HDF5 1.14.6 and NetCDF-C 4.9.3 from
+  conda-forge (pinned; not in the UBI repositories); NetCDF-Fortran 4.6.2
+  from a SHA-256-checked source tarball; cdsapi/netCDF4/cftime pinned from
+  PyPI. Open MPI uses `plm=isolated` (no ssh in the image). `run_case.py`
+  finds `mpirun.openmpi` or `mpirun`. The 72-step test case gives
+  byte-identical stat and 2-D output to the Ubuntu image, as root and as a
+  rootless Podman user. Fixed in both Dockerfiles: the UTIL tools' runtime
+  libraries were looked up without the `UTIL/` prefix. The on-prem guide now
+  assumes a 16-vCPU AMD VM with 64 GB and an NVIDIA L4 (not used: the model
+  is CPU/MPI only).

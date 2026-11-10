@@ -5,10 +5,13 @@ on-premises Linux virtual machine (VM) inside a CMMC Level 2 enclave, that
 is, a system that handles Controlled Unclassified Information (CUI) and must
 meet the 110 requirements of NIST SP 800-171 rev 2.
 
-It adds what is specific to that setting to the
+It uses the **RHEL 9 container image** (`Dockerfile.ubi9`, built on Red
+Hat's Universal Base Image 9), so the container runs the same operating
+system as the host. The model, its settings and its outputs are the same as
+with the Ubuntu-based image described in the
 [container user's guide](Container_User_Guide.md), which explains the model
 settings, ASP decks, ERA5, fire timing and outputs. Read that guide for
-everything about the model itself.
+everything about the model itself; where it says `docker`, use `podman`.
 
 > **This is not a compliance determination.** CMMC sets requirements, not
 > products. What is allowed on your VM is decided by your organization's
@@ -20,7 +23,7 @@ everything about the model itself.
 Contents:
 1. [Assumptions](#1-assumptions)
 2. [What to agree with your ISSO first](#2-what-to-agree-with-your-isso-first)
-3. [Machine size](#3-machine-size)
+3. [Machine size: CPU, memory, GPU](#3-machine-size-cpu-memory-gpu)
 4. [Administrator setup (once)](#4-administrator-setup-once)
 5. [Getting the image](#5-getting-the-image)
 6. [User setup (once per user)](#6-user-setup-once-per-user)
@@ -39,8 +42,9 @@ the sections note what changes.
 
 | Item | Assumed |
 |---|---|
-| VM | Inside the CUI enclave; 16 cores, 64 GB RAM (4 GB per core) |
-| OS | Red Hat Enterprise Linux 9 (or Rocky/Alma 9), hardened (DISA STIG or CIS), **FIPS mode on**, SELinux enforcing |
+| VM | Inside the CUI enclave; 16 vCPUs (AMD), 64 GB RAM; NVIDIA L4 GPU with CUDA 13.4 (not used by the model, see 3.3) |
+| Host OS | Red Hat Enterprise Linux 9, hardened (DISA STIG or CIS), **FIPS mode on**, SELinux enforcing |
+| Container OS | **RHEL 9 as well**: the image is built on Red Hat's Universal Base Image 9 (UBI 9), or on your organization's hardened UBI 9 image (`Dockerfile.ubi9`) |
 | Container runtime | **Podman, rootless** (no Docker daemon, no root for the person running the model) |
 | Privileges | An administrator installs software; model users have no general `sudo` (3.1.5, 3.1.6) |
 | Network | Outbound internet through the enclave's proxy, to allowed hosts only (3.13.1, 3.13.6); the proxy may inspect TLS with an organization CA certificate |
@@ -55,43 +59,67 @@ and usually an entry in the SSP or the software/configuration records.
 
 | # | Item | Why | Requirement |
 |---|---|---|---|
-| 1 | **Approve the software**: Podman (`container-tools`) on the VM, and the SAM-ASP-TUV image and what is in it (section 5.1) | Only approved software may run | 3.4.8, 3.4.9 |
+| 1 | **Approve the software**: Podman (`container-tools`) on the VM, the base image (Red Hat UBI 9, or your hardened UBI 9), and the SAM-ASP-TUV image and what is in it (section 5.1) | Only approved software may run | 3.4.8, 3.4.9 |
 | 2 | **Allow rootless containers**: user namespaces must be enabled for the model user(s) | The RHEL 9 STIG sets `user.max_user_namespaces = 0` unless a documented need exists; rootless Podman needs them | 3.4.2, 3.4.6, 3.4.7 |
 | 3 | **Allow outbound hosts**: for runs, the Copernicus Climate Data Store; for building on the VM, the build hosts (section 5.2) | Default-deny boundary | 3.13.1, 3.13.6 |
-| 4 | **Crypto inside the container**: the image is Ubuntu-based, so its TLS (used only to download public ERA5 data from Copernicus) does not use FIPS-validated modules, even on a FIPS-mode host | FIPS-validated cryptography is required where crypto protects CUI | 3.13.11 |
+| 4 | **Crypto inside the container**: the only network traffic is the ERA5 download, made with RHEL 9's Python and OpenSSL, which follow the host's FIPS mode (section 5.5). The conda-forge libraries carry a second OpenSSL copy that the model never uses | FIPS-validated cryptography is required where crypto protects CUI | 3.13.11 |
 | 5 | **The Copernicus API key**: where it is stored and who can read it | It is a credential for an external service | 3.1.1, 3.5.10 |
 | 6 | **Whether the ASP decks and outputs are CUI**, and where they are stored | Storage, access and marking rules follow from this | 3.1.3, 3.8.x, 3.13.16 |
 | 7 | **Image scanning and patching**: which scanner, how often the image is rebuilt | Vulnerability scanning and flaw remediation | 3.11.2, 3.11.3, 3.14.1 |
 | 8 | **Long runs after logout** (`loginctl enable-linger`) | Runs take hours; idle sessions are locked or ended | 3.1.10, 3.1.11 |
 | 9 | **Stack size limit**: an unlimited stack for the model user | The model needs it; some baselines lock limits | 3.4.2 |
+| 10 | **No GPU access for the model's containers**: the model doesn't use the GPU, so its containers need no GPU device and the NVIDIA container toolkit isn't needed for it | Least functionality | 3.4.6, 3.4.7 |
 
-On item 4: the only network traffic from the container is the ERA5 download
-from Copernicus (public data; the request carries the Copernicus key). If
-your ISSO requires FIPS-validated cryptography inside containers anyway, the
-image can be rebuilt on Red Hat's Universal Base Image (UBI 9); ask the
-model maintainers. Alternatively, download the ERA5 files outside the
-container and give them to the model ([7.3 of the container guide](Container_User_Guide.md#73-using-era5-files-you-already-have)),
-so the container needs no network at all (`--network none`).
+On item 4: the ERA5 download carries only public data and the Copernicus
+key. If the ISSO prefers the container to have no network at all, download
+the ERA5 files outside the container and give them to the model (section
+7.3); then run with `--network none`.
 
 ---
 
-## 3. Machine size
+## 3. Machine size: CPU, memory, GPU
 
-With 16 cores and 64 GB:
+### 3.1 CPU (16 AMD vCPUs)
 
-- **CPU.** The image runs 16 MPI ranks by default, one per core, which fits
-  this VM. Check what the VM's cores are: `lscpu` shows `Thread(s) per
-  core`. Ask the virtualization administrator not to overcommit the VM's
-  vCPUs; the model is CPU-bound, and shared or hyper-threaded vCPUs make it
-  slower. Run **one case at a time**: two runs at once share the 16 cores
-  and each takes about twice as long.
-- **Memory.** 64 GB is ample. A 72-step test used about 1.1 GB in total
-  (measured); the container guide plans conservatively for up to 0.7 GB per
-  rank (11–12 GB for 16 ranks) on long runs.
-- **Disk.** About 10 GB to build the image (if you build on the VM), 1 GB
-  for the image itself, and roughly 1–2 GB of output per model hour. Rootless
-  Podman keeps images in the user's home directory
-  (`~/.local/share/containers`), so check home-directory quotas.
+- The image runs **16 MPI ranks** by default, one per vCPU. Check what the
+  vCPUs are: `lscpu` shows `Thread(s) per core`. If the hypervisor gives
+  the VM 8 physical cores with 2 threads each, 16 ranks still work but each
+  pair shares a core; try a build with `--build-arg NSUBDOMAINS_X=8` and
+  compare the run time of a short case. Ask the virtualization administrator
+  not to overcommit the VM's vCPUs: the model is CPU-bound.
+- **AMD processors are fine.** The model is compiled with the Intel `ifx`
+  compiler but without Intel-only instructions (no `-x` options), so it runs
+  on any x86-64 processor. The Intel math run-time library picks its code
+  path by processor, so results are bit-identical from run to run on the same
+  machine, but the last digits can differ from a run on an Intel processor.
+  Keep that in mind when comparing with results from another machine.
+- Run **one case at a time**: two runs at once share the 16 vCPUs and each
+  takes about twice as long.
+
+### 3.2 Memory (64 GB) and disk
+
+- 64 GB is ample. A 72-step test used about 1.1 GB in total (measured); the
+  container guide plans conservatively for up to 0.7 GB per rank (11–12 GB
+  for 16 ranks) on long runs.
+- Disk: about 15 GB free to build the image (the Intel compiler alone is
+  about 4 GB in the build stage), 0.75 GB for the finished image, and roughly
+  1–2 GB of output per model hour. Rootless Podman keeps images in the
+  user's home directory (`~/.local/share/containers`), so check
+  home-directory quotas.
+
+### 3.3 The NVIDIA L4 GPU is not used
+
+SAM-ASP-TUV runs on CPUs only: it is Fortran parallelized with MPI, and has
+no GPU code. The image therefore contains no CUDA, and its containers need
+no GPU: don't install the NVIDIA container toolkit or pass `--device
+nvidia.com/gpu=...` for this model (item 10). The GPU stays free for other
+work on the VM.
+
+Porting the model to GPUs would be a separate, large project (the Intel
+compiler's GPU offload targets Intel GPUs; NVIDIA GPUs would need OpenACC or
+CUDA Fortran with NVIDIA's compiler). The L4 would also be a weak fit: ASP's
+chemistry is computed in double precision, and the L4's double-precision
+throughput is a small fraction (1/64) of its single-precision throughput.
 
 ---
 
@@ -170,36 +198,46 @@ storage, but output directories on NFS work if the user can write to them.
 
 ### 5.1 What is in the image (for software approval)
 
+The RHEL 9 image is built from `Dockerfile.ubi9`. Its parts:
+
 | Component | Source |
 |---|---|
-| Base OS | Ubuntu 24.04 (`docker.io/library/ubuntu:24.04`) |
-| MPI, NetCDF-C, Python 3, NumPy, netCDF4 | Ubuntu 24.04 packages (`archive.ubuntu.com`, `security.ubuntu.com`) |
-| Intel Fortran/C compiler run-time libraries (`ifx`, `icx`) | conda-forge (`conda.anaconda.org`); Intel's licence terms apply |
-| NetCDF-Fortran | Built from Ubuntu's source package with the Intel compiler |
-| `cdsapi` (Copernicus client) | PyPI (`pypi.org`, `files.pythonhosted.org`) |
+| Base OS | Red Hat Universal Base Image 9.8 (`registry.access.redhat.com/ubi9/ubi:9.8`), or your organization's hardened UBI 9 image (build option `BASE`) |
+| Python 3.9, NumPy, `requests`, OpenSSL | RHEL 9 packages from the UBI repositories (`cdn-ubi.redhat.com`) |
+| Open MPI 4.1.6, HDF5 1.14.6, NetCDF-C 4.9.3 | conda-forge (`conda.anaconda.org`), pinned versions. They are not in the UBI repositories: Open MPI is in full RHEL, HDF5 and NetCDF only in EPEL |
+| Intel Fortran/C compiler 2026.2.0 (run-time libraries only in the final image) | conda-forge, pinned; Intel's licence terms apply |
+| NetCDF-Fortran 4.6.2 | Built from source with the Intel compiler; the source tarball is checked against a SHA-256 checksum |
+| `cdsapi` 0.7.7, `netCDF4` 1.6.5, `cftime` 1.6.3 (and their dependencies) | PyPI (`pypi.org`, `files.pythonhosted.org`), pinned top-level versions |
 | SAM-ASP-TUV, ASP (common_ASP), TUV | This repository and its submodule, compiled from source |
 | Post-processing tools (`UTIL/`) | Compiled from source in this repository |
 
 The image holds no CUI and no credentials: the Copernicus key and your ASP
-decks are mounted at run time. It runs no services and opens no ports.
+decks are mounted at run time. It runs no services, opens no ports, and
+contains no CUDA or GPU software.
 
-To list the installed packages (for the configuration records or a scan
-review):
+To list what is installed (for the configuration records or a scan review):
 
 ```bash
-podman run --rm --entrypoint dpkg-query sam-asp-tuv -W -f '${Package} ${Version}\n'
+podman run --rm --entrypoint rpm sam-asp-tuv -qa | sort                  # RHEL packages
+podman run --rm --entrypoint ls sam-asp-tuv /opt/deps/conda-meta         # conda-forge packages
 podman run --rm --entrypoint python3 sam-asp-tuv -c \
   "import importlib.metadata as m; print(*sorted(f'{d.name} {d.version}' for d in m.distributions()), sep='\n')"
 ```
 
 ### 5.2 Option A: build on the VM
 
-This needs the build hosts in item 3: `github.com` (the code; or copy the
-repository in), the Docker Hub registry (`registry-1.docker.io`,
-`auth.docker.io`, `production.cloudflare.docker.com`),
-`archive.ubuntu.com`, `security.ubuntu.com`, `conda.anaconda.org` and
-`pypi.org`/`files.pythonhosted.org`. If a download fails, the proxy logs
-show which host it was refused.
+This needs these hosts (item 3):
+
+| Host | For |
+|---|---|
+| `github.com` | the code (or copy the repository in) |
+| `registry.access.redhat.com`, and the download host it redirects image layers to (`cdn01.quay.io` when this was tested) | the UBI 9 base image (not needed if `BASE` points to an internal registry) |
+| `cdn-ubi.redhat.com` | UBI 9 packages |
+| `conda.anaconda.org` | Intel compiler, Open MPI, HDF5, NetCDF-C |
+| `archive.ubuntu.com` | the NetCDF-Fortran source tarball only. To use the upstream release or an internal mirror instead, pass `--build-arg NETCDF_FORTRAN_URL=...` and the matching `--build-arg NETCDF_FORTRAN_SHA256=...` |
+| `pypi.org`, `files.pythonhosted.org` | `cdsapi`, `netCDF4` |
+
+If a download fails, the proxy logs show which host was refused.
 
 As the model user:
 
@@ -209,23 +247,28 @@ cd SAM-ASP-TUV
 git checkout asp_v2.2.2
 git submodule update --init
 
-podman build -t sam-asp-tuv:$(git rev-parse --short HEAD) \
+podman build -f Dockerfile.ubi9 -t sam-asp-tuv:$(git rev-parse --short HEAD) \
   --secret id=ca,src=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem \
   .
 podman tag sam-asp-tuv:$(git rev-parse --short HEAD) sam-asp-tuv:latest
 ```
 
-The `--secret` line gives the build the host's trust store, so downloads
-work through a TLS-inspecting proxy. The certificates are used only during
-the build and are not left in the image. Podman passes the host's proxy
-variables to the build. The build takes 15–30 minutes.
+- To build on your organization's hardened UBI 9 image, add `--build-arg
+  BASE=<registry>/<hardened-ubi9-image>:<tag>`. It must still be able to
+  install the RHEL packages listed above with `dnf` (from the UBI
+  repositories or your internal mirror).
+- The `--secret` line gives the build the host's trust store, so downloads
+  work through a TLS-inspecting proxy. The certificates are used only during
+  the build and are not left in the image.
+- Podman passes the host's proxy variables to the build.
+- The build takes 15–30 minutes and needs about 15 GB of free disk (3.2).
 
 ### 5.3 Option B: build elsewhere and transfer the image
 
 If the ISSO prefers not to open the build hosts from the enclave, build the
-image on a machine outside the enclave (any Linux machine with Podman or
-Docker; see [section 3 of the container guide](Container_User_Guide.md#3-building-the-image)),
-then:
+image with the same `podman build -f Dockerfile.ubi9 ...` command on a
+machine outside the enclave (any x86-64 Linux machine with Podman, or Docker
+with BuildKit), then:
 
 ```bash
 # outside the enclave
@@ -249,6 +292,23 @@ Images saved by Docker load into Podman the same way.
 Before first use and after every rebuild, scan the image with the
 vulnerability scanner your organization uses (3.11.2), and record the result
 with the image ID (`podman image inspect --format '{{.Id}}' sam-asp-tuv`).
+
+### 5.5 Check FIPS mode inside the container
+
+On a FIPS-mode RHEL 9 host, RHEL 9 containers run their OpenSSL in FIPS mode
+too: they read the host kernel's FIPS setting. Check it once on the VM:
+
+```bash
+podman run --rm --entrypoint cat sam-asp-tuv /proc/sys/crypto/fips_enabled   # 1
+podman run --rm --entrypoint openssl sam-asp-tuv list -providers             # lists a "fips" provider
+podman run --rm --entrypoint python3 sam-asp-tuv -c "import ssl; print(ssl.OPENSSL_VERSION)"
+```
+
+The Python used for the ERA5 download is RHEL's, linked to RHEL's OpenSSL
+(`/usr/lib64/libssl.so.3`). The conda-forge NetCDF-C library brings its own
+OpenSSL copy (`/opt/deps/lib`) for its remote-data features, and the
+`netCDF4` Python package bundles one too; the model reads only local files,
+so neither is used. Note both in the software record (item 4).
 
 ---
 
@@ -279,8 +339,8 @@ chmod 600 ~/.cdsapirc
 ```
 
 **6.3 Organization CA certificate** (only if the proxy inspects TLS). Copy
-the host's trust store to your own directory, so it can be mounted into the
-container without relabelling a system file:
+the host's trust store to your own directory, so it can be mounted over the
+container's trust store without relabelling a system file:
 
 ```bash
 mkdir -p ~/samasp
@@ -310,7 +370,7 @@ podman run --rm --ulimit stack=-1 --shm-size=1g \
   -v $D/decks:/decks:ro,Z \
   -v $D/runs/williams:/output:Z \
   -v ~/.cdsapirc:/root/.cdsapirc:ro,Z \
-  -v ~/samasp/ca-bundle.pem:/etc/ssl/certs/ca-certificates.crt:ro,Z \
+  -v ~/samasp/ca-bundle.pem:/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem:ro,Z \
   -e ASP_DECK_DIR=/decks -e CASE=williams \
   -e LAT=39.70 -e LON=-122.58 -e DATE=2009-11-17 -e START_TIME=20:00 \
   -e RUN_HOURS=4.5 \
@@ -323,6 +383,7 @@ podman run --rm --ulimit stack=-1 --shm-size=1g \
 - Leave out the `ca-bundle.pem` line if the proxy doesn't inspect TLS.
 - Root inside a rootless container is your own account outside it, so the
   outputs belong to you and the container has no more rights than you do.
+- No `--device` or GPU option: the model doesn't use the GPU (3.3).
 - All settings (`LAT`, `RUN_HOURS`, `FIRE_START_STEP`, ...) are in
   [section 5 of the container guide](Container_User_Guide.md#5-settings-reference).
 
@@ -338,7 +399,7 @@ systemd-run --user --unit=samasp-williams --collect \
   podman run --rm --ulimit stack=-1 --shm-size=1g \
     -v $D/decks:/decks:ro,Z -v $D/runs/williams:/output:Z \
     -v $HOME/.cdsapirc:/root/.cdsapirc:ro,Z \
-    -v $HOME/samasp/ca-bundle.pem:/etc/ssl/certs/ca-certificates.crt:ro,Z \
+    -v $HOME/samasp/ca-bundle.pem:/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem:ro,Z \
     -e ASP_DECK_DIR=/decks -e CASE=williams \
     -e LAT=39.70 -e LON=-122.58 -e DATE=2009-11-17 -e START_TIME=20:00 \
     -e RUN_HOURS=4.5 \
@@ -411,12 +472,15 @@ the run directory's `case/`, `ERA5_cache/` and `run.out`.
 podman image inspect --format '{{.Id}} {{.RepoTags}}' sam-asp-tuv
 ```
 
-**Updates.** The image's Ubuntu packages get security fixes over time.
-Rebuild the image on the schedule your flaw-remediation policy sets (for
-example monthly, or when a scan finds a fixed vulnerability; 3.14.1), scan
-it again, and keep the previous image until results from the new one are
-checked. Rebuilding with the same code gives the same model results unless
-the compiler version changed, so note the image ID with every run.
+**Updates.** The image's RHEL packages get security fixes over time (a
+rebuild installs the current ones). Rebuild the image on the schedule your
+flaw-remediation policy sets (for example monthly, or when a scan finds a
+fixed vulnerability; 3.14.1), scan it again, and keep the previous image
+until results from the new one are checked. The compiler, MPI, NetCDF and
+Python packages are pinned in `Dockerfile.ubi9`; to take a fix in one of
+them, change its version there. Rebuilding with the same code and pinned
+versions should give the same model results; note the image ID with every
+run.
 
 **Removal.** To remove the model from the VM:
 
@@ -442,7 +506,9 @@ settings from section 4 if nothing else needs them.
 | The run stops when you log out | Lingering isn't enabled, or the run wasn't started with `systemd-run`: sections 4.3 and 7.2. |
 | ERA5 download: `SSL: CERTIFICATE_VERIFY_FAILED` | The proxy inspects TLS: mount the CA bundle (section 6.3, 7.1). |
 | ERA5 download: connection refused or timed out | The proxy variables aren't set, or the Copernicus hosts aren't allowed. Copernicus serves finished downloads from a separate host; the proxy logs show which host was refused. |
-| `podman build`: `short-name resolution` prompt or error | An old copy of the Dockerfile names the base image `ubuntu:24.04`; use `--build-arg UBUNTU=docker.io/library/ubuntu:24.04`. |
+| `podman build`: `short-name resolution` prompt or error | A `BASE` given without a registry name; give the full name (`registry.example.org/...`). |
+| `podman build`: `sha256sum: WARNING: computed checksum did NOT match` | `NETCDF_FORTRAN_URL` was changed without the matching `NETCDF_FORTRAN_SHA256`, or the download was altered. |
+| `run.out`: `plm_rsh_agent ... ssh : rsh` could not be found | Open MPI looked for `ssh`. The RHEL 9 image sets `OMPI_MCA_plm=isolated` (one machine, no `ssh`); don't override it with `-e OMPI_MCA_plm=...`. |
 | `podman build`: download errors | Build hosts not allowed (section 5.2), or the CA bundle wasn't passed with `--secret`. |
 | Image storage fills the home directory | Ask the administrator for space, or set `graphroot` in `~/.config/containers/storage.conf` to a larger local (not NFS) directory you own. |
 
@@ -453,20 +519,22 @@ in [section 12 of the container guide](Container_User_Guide.md#12-troubleshootin
 
 ## 11. What was tested
 
-- **Rootless Podman** (Podman 4.9 on Ubuntu 24.04, as an ordinary user):
-  loading a Docker-built image, and a 72-step fire case with mounted decks
-  and ERA5 files, `:Z` mounts and `--network none`. The run finished, the
-  outputs belonged to the user, and the statistics and 2-D output files were
-  byte-identical to the same run under Docker.
-- **`podman build`** of the Dockerfile (Podman 4.9, run as root here, through
-  a TLS-inspecting proxy with the CA bundle passed as a build secret): the
-  build succeeded, no CA certificate was left in the image, and the 72-step
-  case gave byte-identical results to the Docker-built image. A rootless
-  `podman build` was not tried.
+In this project's cloud workspace (Ubuntu 24.04 host, Podman 4.9):
+
+- **The RHEL 9 image** (`Dockerfile.ubi9` on UBI 9.8): built with `podman
+  build` through a TLS-inspecting proxy, with the CA bundle as a build
+  secret. A 72-step fire case with mounted decks and ERA5 files, run with
+  `--network none`, finished, and its statistics and 2-D output files were
+  **byte-identical** to the same run with the Ubuntu-based image.
+- **Rootless Podman** as an ordinary user, with `:Z` mounts: the run
+  finished and the outputs belonged to the user (see the note below on which
+  image).
+- **Python** uses RHEL's OpenSSL 3.5.8 inside the image.
 - **Memory**: the 72-step test peaked at about 1.1 GB for 16 ranks.
 
-Not tested: RHEL 9 itself, FIPS mode, the STIG settings, SELinux enforcing,
-`systemd-run` with lingering, a TLS-inspecting enterprise proxy at run time,
-and real ERA5 downloads. The steps follow Red Hat's and Podman's
-documentation; try a short case first (for example `RUN_HOURS=0.2
-FIRE_START_STEP=0`) before planning long runs.
+Not tested: a RHEL 9 host, FIPS mode (section 5.5), the STIG settings,
+SELinux enforcing, an organization's hardened UBI 9 base, `systemd-run` with
+lingering, an enterprise proxy at run time, real ERA5 downloads, and the
+AMD/L4 VM itself. The steps follow Red Hat's and Podman's documentation; try
+a short case first (for example `RUN_HOURS=0.2 FIRE_START_STEP=0`) before
+planning long runs.

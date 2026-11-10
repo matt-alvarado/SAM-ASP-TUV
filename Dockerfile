@@ -63,7 +63,7 @@ RUN test -f SRC_TUV/ASP/src/StepASP4SAM.f90 || \
     SAMASP_ENV=/opt/samasp-env.sh UTIL/build_util.sh > /dev/null && \
     rm -rf _build OBJ && \
     mkdir -p /runtime-libs && \
-    ldd SAM_RAD_CAM_MICRO_M2005_w_aero $(sed -n 's/^\///p' UTIL/.gitignore) | awk '$3 ~ /^\/opt\// {print $3}' | \
+    ldd SAM_RAD_CAM_MICRO_M2005_w_aero $(sed -n 's/^\//UTIL\//p' UTIL/.gitignore) | awk '$3 ~ /^\/opt\// {print $3}' | \
         sort -u | xargs -I{} cp --parents -L {} /runtime-libs/
 
 # ---------------------------------------------------------------- runtime

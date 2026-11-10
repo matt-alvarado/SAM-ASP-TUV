@@ -130,6 +130,7 @@ checked out.
 | `--build-arg NSUBDOMAINS_X=8` | Number of MPI ranks (subdomains in x). It must divide 240, so 4, 6, 8, 10, 12, 16, 20, 24, … work; the default is 16. Choose it to match the physical cores of the machine you'll run on ([section 10](#10-performance-and-machine-size)). |
 | `--secret id=ca,src=/path/to/ca.crt` | An extra CA certificate, for building behind a corporate proxy that intercepts TLS. It's used only during the build and not kept in the image. |
 | `--build-arg HTTPS_PROXY=http://proxy:port` | Standard Docker proxy settings, if your network needs them. |
+| `-f Dockerfile.ubi9` | Build the **RHEL 9** image instead (Red Hat Universal Base Image 9), for sites that need the container's OS to be RHEL. Same model, entry point and settings; results are identical. See the [on-prem guide](OnPrem_RHEL_CMMC_Guide.md). |
 
 It's useful to tag the image with the rank count and the code version, for example:
 

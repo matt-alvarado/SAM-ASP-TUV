@@ -145,8 +145,10 @@ def main(argv=None):
         resource.setrlimit(resource.RLIMIT_STACK, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
     except (ValueError, OSError):
         print('WARNING: could not lift the stack limit; run the container with --ulimit stack=-1')
+    # Ubuntu names it mpirun.openmpi; elsewhere (e.g. the RHEL 9 image) it is mpirun
+    mpirun = shutil.which('mpirun.openmpi') or shutil.which('mpirun') or 'mpirun'
     with open(os.path.join(out, 'run.out'), 'w') as log:
-        rc = subprocess.run(['mpirun.openmpi', '--allow-run-as-root', '--oversubscribe',
+        rc = subprocess.run([mpirun, '--allow-run-as-root', '--oversubscribe',
                              '-np', str(nranks), './' + EXE], stdout=log, stderr=subprocess.STDOUT).returncode
     last = [l for l in open(os.path.join(out, 'run.out'), errors='replace') if 'NSTEP =' in l]
     step = int(last[-1].split()[2]) if last else 0
