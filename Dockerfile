@@ -59,10 +59,11 @@ RUN test -f SRC_TUV/ASP/src/StepASP4SAM.f90 || \
     echo $((NSUBDOMAINS_X * ny)) > NRANKS && \
     SAMASP_ENV=/opt/samasp-env.sh ./build_ifx.sh > /tmp/build.out 2>&1 || \
         { tail -30 /tmp/build.out; tail -40 _build/sam_build.log 2>/dev/null; exit 1; } && \
+    SAMASP_ENV=/opt/samasp-env.sh UTIL/build_stat2nc.sh > /dev/null && \
     rm -rf _build OBJ && \
     mkdir -p /runtime-libs && \
-    ldd SAM_RAD_CAM_MICRO_M2005_w_aero | awk '$3 ~ /^\/opt\// {print $3}' | \
-        xargs -I{} cp --parents -L {} /runtime-libs/
+    ldd SAM_RAD_CAM_MICRO_M2005_w_aero UTIL/stat2nc | awk '$3 ~ /^\/opt\// {print $3}' | \
+        sort -u | xargs -I{} cp --parents -L {} /runtime-libs/
 
 # ---------------------------------------------------------------- runtime
 FROM ${UBUNTU}

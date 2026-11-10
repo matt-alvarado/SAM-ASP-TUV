@@ -114,7 +114,7 @@ c time-point ntimeend.
 	integer nread ! number of time-points actually read
 !   local:
 	integer ntime,k,l,hbuf_length
-	character *8 namelist
+	character *20 namelist
 
 	rewind(unit)
 	ntime=0

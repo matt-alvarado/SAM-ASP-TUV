@@ -520,3 +520,14 @@ Timings are asptest (30 steps, 16 MPI ranks oversubscribed on this machine).
   stops the run at start-up with a message (`hbuffer.f90`) instead of only
   printing a warning. asptest: 3D output identical; in the stat file only
   that entry's name changes (no cloud cores there, so its values were zero).
+- `UTIL/stat2nc` fixed for SAM-ASP-TUV statistics files. It crashed because
+  the readers (`UTIL/SRC/hbuf.inc`, `hbuf_lib.f`) allowed 1,000 profiles and
+  8-character names, while SAM-ASP writes about 9,000 profiles with
+  20-character names (truncation would also have merged, e.g., `1-ButeneFLX`
+  into `1-Butene`). Now: 100,000 profiles and 20-character names; profiles are
+  defined at once and read in one pass (0.5 s for asptest, instead of one full
+  file scan per profile); names netCDF rejects (`(NH4)2SO401`) get a leading
+  `_` with the original in `sam_name`; 64-bit-offset netCDF. asptest: all
+  9,144 profiles at all 3 times equal the raw file exactly. Built from source
+  in the container (`UTIL/build_stat2nc.sh`); the committed binary is the old
+  one.

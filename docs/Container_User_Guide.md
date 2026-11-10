@@ -420,11 +420,24 @@ docker run --rm -v ~/samasp/results/OUT_3D:/data -w /data \
 # writes fire_fire_16.bin2D_1.nc: every field on (time, z, x)
 ```
 
-Known limitation: `UTIL/stat2nc` (for the `.stat` file) is a legacy prebuilt
-tool, and it currently fails on SAM-ASP-TUV statistics files, which hold
-about 9,000 profiles. Use the `.bin2D` snapshots, or read the `.stat` file
-directly. It's a Fortran unformatted sequential file; the layout is written
-by `hbuf_write` in `SRC_TUV/hbuffer.f90`.
+To convert the statistics file (horizontal-mean profiles and time series):
+
+```bash
+docker run --rm -v ~/samasp/results/OUT_STAT:/data -w /data \
+  --entrypoint /opt/sam-asp-tuv/UTIL/stat2nc sam-asp-tuv fire_fire.stat
+# writes fire_fire.nc: every profile on (time, z), plus the time series
+```
+
+`stat2nc` in the image is built from source with the model, and handles
+SAM-ASP-TUV files with thousands of profiles. Notes on its output:
+
+- netCDF names can't start with `(`. Species such as `(NH4)2SO401` are
+  written as `_(NH4)2SO401`, and their original name is kept in the
+  attribute `sam_name`.
+- The file is netCDF-3 with 64-bit offsets, so it can be larger than 2 GB.
+- Outside the container, build it with `UTIL/build_stat2nc.sh` (it uses the
+  same environment file as `build_ifx.sh`). The `UTIL/stat2nc` binary
+  committed to the repository is the old one and fails on these files.
 
 ---
 

@@ -21,6 +21,9 @@ c-------------------------------------------------------
         character(80) long_name
         character(10) abbr_name
         character(12) units
+        character(20) sname
+        integer, allocatable :: pvarid(:)
+        integer start(2), count(2), nlen
 
 	integer iargc
 	external iargc
@@ -51,6 +54,14 @@ c-------------------------------------------------------
 c Count how many time points in a file:
 	print*,'.......',ntime,time,nzm,z,p,caseid,version
 	call HBUF_info(2,ntime,time,nzm,z,p,caseid,version)
+	if(ntime.eq.0) then
+	 print*,'stat2nc: no data in ',trim(filename)
+	 stop 1
+	end if
+	if(ntime*nzm.gt.500000.or.ntime.gt.50000.or.nzm.gt.500) then
+	 print*,'stat2nc: too many times or levels:',ntime,nzm
+	 stop 1
+	end if
 	call HBUF_read(2,nzm,'RHO',1,1,rho,m)
 	print*,'.......',ntime
 	print*,'here in stat2nc.f'
@@ -68,7 +79,7 @@ c Count how many time points in a file:
         end do
         dz(nzm) = dz(nzm-1)
 
-	err = NF_CREATE(filename2, NF_CLOBBER, ncid)
+	err = NF_CREATE(filename2, NF_CLOBBER+NF_64BIT_OFFSET, ncid)
 
 	err = NF_REDEF(ncid)
 
@@ -1514,28 +1525,78 @@ c--------------------------------------------------------
         end if
 
 c--------------------------------------------------------------
+c Profiles. All variables are defined at once and the file is read in a
+c single pass: one HBUF_read per variable rescans the whole file, which is
+c far too slow for SAM-ASP files with thousands of profiles. Names that are
+c not valid netCDF names (SAM-ASP species such as "(NH4)2SO401") get a
+c leading "_"; the original name is kept in the attribute sam_name.
         ndimids=2
         vdimids(1) = zid
         vdimids(2) = timeid
-
+        allocate(pvarid(hbuf_length))
+        err = NF_REDEF(ncid)
         do k=1,hbuf_length
-
-           write(6,'(a72)') deflist(k)
-           call HBUF_read(2,nzm,namelist(k),1,ntime,f,m)
-
-           err = NF_REDEF(ncid)
            name = namelist(k)
+           do l=1,len_trim(name)
+              if(name(l:l).eq.'/') name(l:l) = '_'
+           end do
+           if(verify(name(1:1),'ABCDEFGHIJKLMNOPQRSTUVWXYZ'//
+     &        'abcdefghijklmnopqrstuvwxyz0123456789_').ne.0)
+     &        name = '_'//name
            l=len_trim(name)
            err = NF_DEF_VAR(ncid,name(1:l),NF_FLOAT,
-     &                                  ndimids,vdimids,varid)
-           err = NF_PUT_ATT_TEXT(ncid,varid,'long_name',
+     &                                  ndimids,vdimids,pvarid(k))
+           if(err.ne.NF_NOERR) then
+              print*,'skipping profile ',trim(namelist(k)),': ',
+     &               trim(NF_STRERROR(err))
+              pvarid(k) = -1
+              cycle
+           end if
+           err = NF_PUT_ATT_TEXT(ncid,pvarid(k),'long_name',
      &                                len_trim(deflist(k)),deflist(k))
-           err = NF_PUT_ATT_TEXT(ncid,varid,'units',
+           err = NF_PUT_ATT_TEXT(ncid,pvarid(k),'units',
      &                              len_trim(unitlist(k)),unitlist(k))
-           err = NF_ENDDEF(ncid)
-           err = NF_PUT_VAR_REAL(ncid, varid, f)
-           if(err.ne.0) print*,'error:',err
+           if(name(1:l).ne.trim(namelist(k))) err = NF_PUT_ATT_TEXT
+     &         (ncid,pvarid(k),'sam_name',len_trim(namelist(k)),
+     &          namelist(k))
+        end do
+        err = NF_ENDDEF(ncid)
+        print*,'writing',hbuf_length,' profiles at',ntime,' times'
 
+        count(1) = nzm
+        count(2) = 1
+        start(1) = 1
+        rewind(2)
+        do i=1,ntime
+           read(2)
+           read(2)
+           read(2) nlen
+           start(2) = i
+           do l=1,nlen
+              read(2) sname
+              read(2)
+              read(2)
+              read(2) (tmp(k),k=1,nzm)
+c             the list is normally the same at every time; search if not
+              j = l
+              if(j.gt.hbuf_length) j = 0
+              if(j.gt.0) then
+                 if(namelist(j).ne.sname) j = 0
+              end if
+              if(j.eq.0) then
+                 do k=1,hbuf_length
+                    if(namelist(k).eq.sname) then
+                       j = k
+                       exit
+                    end if
+                 end do
+              end if
+              if(j.eq.0) cycle
+              if(pvarid(j).lt.0) cycle
+              err = NF_PUT_VARA_REAL(ncid,pvarid(j),start,count,tmp)
+              if(err.ne.NF_NOERR) print*,'error writing ',
+     &             trim(sname),': ',trim(NF_STRERROR(err))
+           end do
         end do
 
 
