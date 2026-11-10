@@ -436,8 +436,8 @@ SAM-ASP-TUV files with thousands of profiles. Notes on its output:
   attribute `sam_name`.
 - The file is netCDF-3 with 64-bit offsets, so it can be larger than 2 GB.
 - Outside the container, build it with `UTIL/build_stat2nc.sh` (it uses the
-  same environment file as `build_ifx.sh`). The `UTIL/stat2nc` binary
-  committed to the repository is the old one and fails on these files.
+  same environment file as `build_ifx.sh`). The repository has no prebuilt
+  `stat2nc` binary; it is always built from source.
 
 ---
 

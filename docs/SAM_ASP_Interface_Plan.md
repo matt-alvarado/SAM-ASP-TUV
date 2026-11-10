@@ -529,5 +529,6 @@ Timings are asptest (30 steps, 16 MPI ranks oversubscribed on this machine).
   file scan per profile); names netCDF rejects (`(NH4)2SO401`) get a leading
   `_` with the original in `sam_name`; 64-bit-offset netCDF. asptest: all
   9,144 profiles at all 3 times equal the raw file exactly. Built from source
-  in the container (`UTIL/build_stat2nc.sh`); the committed binary is the old
-  one.
+  in the container (`UTIL/build_stat2nc.sh`). The old prebuilt `UTIL/stat2nc`
+  binary was removed from the repository (and is git-ignored), so it is only
+  built from source.
