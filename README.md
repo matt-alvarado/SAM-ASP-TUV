@@ -20,3 +20,42 @@ files you already have instead. The `prm` comes from `RUNDATA/prm_template`
 (edit it, or pass `--prm-template`); `--dt`, `--hours` and `--wind-axis` set
 the time step, run length and axis orientation. `--params params.txt` reads
 the old input file format. Tests (offline): `python3 -m unittest discover -s tests`.
+
+## Running in a container
+
+The `Dockerfile` builds the model (Intel ifx, Open MPI, NetCDF) and runs one
+fire case per container. Build once (the common_ASP submodule must be checked
+out):
+
+    git submodule update --init
+    docker build -t sam-asp-tuv .            # --build-arg NSUBDOMAINS_X=8 for 8 MPI ranks
+
+Run a case, with the ASP input decks and an output directory mounted:
+
+    docker run --rm --ulimit stack=-1 \
+      -v /path/to/my_decks:/decks  -v /path/to/results:/output \
+      -e ASP_DECK_DIR=/decks \
+      -e LAT=39.70 -e LON=-122.58 -e DATE=2009-11-17 -e START_TIME=20:00 \
+      -e RUN_HOURS=4 -e CDSAPI_KEY=<your CDS key> \
+      sam-asp-tuv
+
+| Setting | Variable (or option) | |
+|---|---|---|
+| fire latitude, longitude | `LAT`, `LON` (`--lat`, `--lon`) | required |
+| start date and time, UTC | `DATE` (YYYY-MM-DD), `START_TIME` (HH:MM) | required |
+| run length (hours) | `RUN_HOURS` (`--hours`) | required |
+| ASP input decks | `ASP_DECK_DIR` (`--decks`), a mounted directory | default: decks in the image |
+| fire emission flux | `MASSEMIS` | default 4.86e-6 |
+| fire start (spin-up) step | `FIRE_START_STEP` | default 1080 |
+| time step (s), case name | `DT` (8), `CASE` (fire) | |
+| ERA5 | `CDSAPI_KEY`, or mount `/root/.cdsapirc`, or `ERA5_PL_FILE` + `ERA5_SL_FILE` (mounted files) | |
+
+The deck directory must hold a full SAM-ASP deck set (`ASPInputDeck.in`,
+`GasPhaseChems.in`, `GasChemicalMechanism.in`, `PhotoRates.in`, `PhotoMap.in`,
+the aerosol mode files, ...), like `SRC_TUV/ASP/InorganicInputDecks/`.
+Results in the output directory: SAM's `OUT_STAT`, `OUT_3D`, `OUT_2D`, ...;
+`ASP/` (ASP output files); `case/` (the case's input files and
+`met_source.txt`); `ERA5_cache/`; `run.out` (model log). The run uses the MPI
+rank count the image was built with (16 by default), oversubscribing the cores
+if there are fewer; fire emissions start after `FIRE_START_STEP` steps
+(spin-up), so `RUN_HOURS` must cover that, and the run warns if it does not.

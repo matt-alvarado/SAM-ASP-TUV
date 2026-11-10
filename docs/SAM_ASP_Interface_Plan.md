@@ -497,6 +497,19 @@ Timings are asptest (30 steps, 16 MPI ranks oversubscribed on this machine).
   1000 hPa, which can be below the ground) and vg also averaged levels below
   the ground. Offline tests in
   `tests/`; a case written from synthetic ERA5 files ran in SAM (100 steps).
+- *Container* (`Dockerfile`, `docker/run_case.py`, README "Running in a
+  container"): a two-stage image (build: Ubuntu 24.04, Open MPI, NetCDF-C,
+  Intel ifx/icx from conda-forge, NetCDF-Fortran rebuilt with ifx, then
+  `build_ifx.sh`; runtime: 1.1 GB, only the Intel/NetCDF-Fortran libraries
+  the binary links). One container runs one fire case: latitude, longitude,
+  date, start time, run length and the ASP deck directory (mounted) are set
+  at `docker run` (environment variables or options), plus optional emission
+  flux, fire start step, time step and the ERA5 source (CDS key or mounted
+  files); results go to a mounted /output. `create_run.py --set NAME=VALUE`
+  sets any &PARAMETERS entry. Tested: image built here; a 72-step case with
+  mounted decks and synthetic ERA5 files ran (fire, then ASP chemistry: O3
+  titration, PAN and HONO in the plume); errors for a missing deck or ERA5
+  source.
 - Overall, asptest against the pre-submodule baseline (`2ecba69`, same
   machine and compilers): 579 s -> 52 s, about 11 times faster.
 - Statistics name clash fixed: the ASP gas tracer `MCR` (methacrolein) had

@@ -76,8 +76,40 @@ def derived(m, wind_axis='Ay', theta=np.pi * 0.40):
                 tau=tau, theta=theta, rho=rho, inbl=inbl)
 
 
-def write_case(casedir, m, d, prm_template, prm_values, lst_file):
-    """Write snd, lsf, sfc, grd, lst, prm and met_source.txt into casedir"""
+def set_namelist(text, group, settings):
+    """Set entries of namelist group (e.g. 'PARAMETERS') in prm text: an
+    existing (uncommented) "name = value" line is replaced, otherwise
+    "name = value," is added before the group's closing "/". settings is a
+    list of (name, value) with value already in Fortran syntax."""
+    import re
+    lines = text.split('\n')
+    start = next((k for k, l in enumerate(lines)
+                  if l.strip().upper().startswith('&' + group.upper())), None)
+    if start is None:
+        raise SystemExit('prm has no &%s group' % group)
+    end = next((k for k in range(start + 1, len(lines)) if lines[k].strip() == '/'), None)
+    if end is None:
+        raise SystemExit('prm: &%s has no closing "/"' % group)
+    for name, value in settings:
+        pat = re.compile(r'^\s*%s\s*=' % re.escape(name), re.IGNORECASE)
+        hit = [k for k in range(start + 1, end) if pat.match(lines[k])]
+        if len(hit) > 1:
+            raise SystemExit('prm: %s is set on more than one line' % name)
+        new = ' %s = %s,' % (name, value)
+        if hit:
+            if ',' in lines[hit[0]].split('!')[0].split('=', 1)[1].rstrip(' ,') \
+               and not lines[hit[0]].split('!')[0].rstrip().endswith(','):
+                raise SystemExit('prm: cannot replace the multi-value line for %s' % name)
+            lines[hit[0]] = new
+        else:
+            lines.insert(end, new)
+            end += 1
+    return '\n'.join(lines)
+
+
+def write_case(casedir, m, d, prm_template, prm_values, lst_file, prm_settings=()):
+    """Write snd, lsf, sfc, grd, lst, prm and met_source.txt into casedir;
+    prm_settings: extra (name, value) entries of &PARAMETERS"""
     os.makedirs(casedir, exist_ok=True)
     day0 = calendar_day(m.time)
     days = [day0 + i for i in range(NPTS)]
@@ -112,6 +144,8 @@ def write_case(casedir, m, d, prm_template, prm_values, lst_file):
     except KeyError as e:
         raise SystemExit('prm template %s uses {%s}, which create_run.py does not provide'
                          % (prm_template, e.args[0]))
+    if prm_settings:
+        prm = set_namelist(prm, 'PARAMETERS', prm_settings)
     with open(os.path.join(casedir, 'prm'), 'w') as f:
         f.write(prm)
     with open(os.path.join(casedir, 'met_source.txt'), 'w') as f:

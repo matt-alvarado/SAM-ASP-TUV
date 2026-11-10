@@ -1,0 +1,21 @@
+# Not needed in the image (build products, run outputs, caches, git data)
+.git
+**/.git
+_build
+OBJ
+_run_asptest
+SAM_*_w_aero
+OUT_2D
+OUT_3D
+OUT_MOMENTS
+OUT_STAT
+OUT_MOVIES
+RESTART
+ERA5_cache
+NCEP
+**/__pycache__
+SRC_TUV/ASP/ObjectFiles
+SRC_TUV/ASP/ModuleFiles
+SRC_TUV/ASP/libAspLibrary.a
+SRC_TUV/TUV/*.o
+SRC_TUV/TUV/libTuvLibrary.a

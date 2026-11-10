@@ -271,6 +271,22 @@ class DownloadAndCase(unittest.TestCase):
         self.assertIn('massemis = 4.86e-06', prm)
         self.assertIn('longitude0 = -122.58', prm)
 
+    def test_set_namelist(self):
+        create_run.main(['--case', 'S', '--lat', '39.70', '--lon', '-122.58',
+                         '--time', '2009-11-17T20:00', '--massemis', '1e-6', '--rundir', self.run,
+                         '--pl-file', self.pl, '--sl-file', self.sl,
+                         '--set', 'nstat=50', '--set', 'fire_nstep_start=0',
+                         '--set', "asp_deck_dir='/decks/'"])
+        prm = read(os.path.join(self.run, 'RUNS', 'S', 'prm'))
+        body = [l for l in prm.splitlines() if not l.strip().startswith('!')]
+        self.assertIn(' nstat = 50,', body)                  # replaced
+        self.assertEqual(sum(1 for l in body if l.strip().startswith('nstat =')), 1)
+        self.assertIn(' nstatfrq = 5,', body)                # similar name untouched
+        i = body.index(' fire_nstep_start = 0,')             # added before the "/"
+        self.assertIn(" asp_deck_dir = '/decks/',", body)
+        close = max(k for k, l in enumerate(body) if l.strip() == '/')   # &PARAMETERS' "/"
+        self.assertGreater(close, i)
+
     def test_params_file(self):
         p = os.path.join(self.d, 'params.txt')
         with open(p, 'w') as f:

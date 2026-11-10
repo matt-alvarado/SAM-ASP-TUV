@@ -76,6 +76,9 @@ def main(argv=None):
     ap.add_argument('--cache', help='ERA5 download cache (default <rundir>/ERA5_cache)')
     ap.add_argument('--pl-file', help='use this ERA5 pressure-level netCDF file (no download)')
     ap.add_argument('--sl-file', help='use this ERA5 single-level netCDF file (no download)')
+    ap.add_argument('--set', action='append', default=[], metavar='NAME=VALUE',
+                    help='set a &PARAMETERS entry in prm (Fortran syntax, e.g. '
+                    "--set fire_nstep_start=0 --set \"asp_deck_dir='decks/'\"); repeatable")
     a = ap.parse_args(argv)
 
     if a.params:
@@ -96,6 +99,12 @@ def main(argv=None):
     lst = os.path.join(a.rundir, 'RUNDATA', 'lst')
     cache = a.cache or os.path.join(a.rundir, 'ERA5_cache')
     nstop = int(round(a.hours * 3600.0 / a.dt))
+    settings = []
+    for kv in a.set:
+        if '=' not in kv:
+            ap.error('--set needs NAME=VALUE, got %r' % kv)
+        k, v = kv.split('=', 1)
+        settings.append((k.strip(), v.strip()))
 
     for name, c in zip(names, cases):
         lon = c['lon'] - 360.0 if c['lon'] > 180.0 else c['lon']
@@ -110,7 +119,7 @@ def main(argv=None):
                               dict(caseid=name, latitude0=c['lat'], longitude0=lon, dt=a.dt,
                                    nstop=nstop, massemis=c['massemis'],
                                    requested_time=c['time'].strftime('%Y-%m-%d %H:%M'),
-                                   wind_axis=a.wind_axis), lst)
+                                   wind_axis=a.wind_axis), lst, settings)
         print('%s: ERA5 %.2fN %.2fE %s UTC; psfc %.1f hPa, PBL %.0f m, H %.1f, LE %.1f W/m2, '
               'vg %.2f m/s -> %s' % (name, m.lat, m.lon, m.time.strftime('%Y-%m-%d %H:%M'),
                                      m.psfc, m.hpbl, m.shf, m.lhf, d['vg'], casedir))
