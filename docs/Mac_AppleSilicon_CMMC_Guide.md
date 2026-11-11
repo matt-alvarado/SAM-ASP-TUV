@@ -228,10 +228,18 @@ In this project's cloud workspace (x86-64 Linux, no Mac available):
   section 7. This comparison also found a bug in `write_fields3D.f90` (five
   gas-phase organic output fields read past their arrays), fixed for all builds.
 - **`Dockerfile.ubi9-gnu`, x86-64**: builds and runs the test case.
-- **`Dockerfile.ubi9-gnu`, ARM64**: see the note below on the build and test
-  run under QEMU emulation.
+- **`Dockerfile.ubi9-gnu`, ARM64**, built and run on x86-64 under QEMU
+  emulation (`--platform linux/arm64`): the image builds (24 min under
+  emulation), the model binary is ARM64 (aarch64), the 72-step test case
+  finishes, and its plume means agree with the Intel build as closely as the
+  x86-64 gfortran build does (within about 0.5-0.7%). ARM64 and x86-64
+  gfortran results are close but not byte-identical (the compilers' math
+  libraries differ between architectures).
+- **Rootless Podman** (Podman 4.9, ordinary user, `:Z` mounts,
+  `--network none`): the ARM64 image runs a short case and the outputs
+  belong to the user.
 
 Not tested: a Mac, the hypervisors, RHEL 9 for ARM, FIPS mode, Podman machine,
-and run times on Apple silicon (emulation times say nothing about native
-speed). Run a short case first (for example `--hours 0.2 --fire-start-step 0`)
+and run times on Apple silicon (the 30-minute emulated run says nothing about
+native speed; the x86-64 gfortran build is about as fast as the Intel one). Run a short case first (for example `--hours 0.2 --fire-start-step 0`)
 and time it before planning long runs.
