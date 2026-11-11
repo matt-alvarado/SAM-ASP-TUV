@@ -30,7 +30,10 @@ See [docs/Container_User_Guide.md](docs/Container_User_Guide.md) for the full
 guide (settings, ASP decks, ERA5, outputs, troubleshooting, and running on AWS),
 and [docs/OnPrem_RHEL_CMMC_Guide.md](docs/OnPrem_RHEL_CMMC_Guide.md) for an on-prem
 RHEL VM in a CMMC Level 2 (CUI) enclave, with rootless Podman. `Dockerfile.ubi9`
-builds the same image on Red Hat's Universal Base Image 9 (RHEL 9).
+builds the same image on Red Hat's Universal Base Image 9 (RHEL 9), and
+`Dockerfile.ubi9-gnu` builds it with gfortran for ARM64 (Apple silicon; see
+[docs/Mac_AppleSilicon_CMMC_Guide.md](docs/Mac_AppleSilicon_CMMC_Guide.md)).
+`build_gnu.sh` builds the model with the GNU compilers outside a container.
 
 The `Dockerfile` builds the model (Intel ifx, Open MPI, NetCDF) and runs one
 fire case per container. Build once (the common_ASP submodule must be checked

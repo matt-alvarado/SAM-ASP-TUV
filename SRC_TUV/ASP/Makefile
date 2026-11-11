@@ -116,14 +116,26 @@ FILESDUMP = asp
 
 # Compiler: ifort by default; set ASP_FC=ifx for the Intel oneAPI compiler.
 # (FC has a built-in make default, so a separate name is used.)
+# ASP_FC=gfortran builds with GNU Fortran (e.g. on ARM64 / Apple silicon), with the
+# flags of the ASP repository's ASPMakefile.linux.gfortran (minus the x86-only -m64).
 ASP_FC ?= ifort
 ifeq ($(ASP_FC),ifx)
   ASP_FC_OPTS ?= -DIFORT -fp-model=precise
+else ifeq ($(ASP_FC),gfortran)
+  ASP_FC_OPTS ?= -DGFORTRAN -fallow-argument-mismatch -ffp-contract=off
 else
   ASP_FC_OPTS ?= -DIFORT -fp-stack-check -fp-model source
 endif
 FC = $(ASP_FC) $(ASP_FC_OPTS)
 
+ifeq ($(ASP_FC),gfortran)
+LDFLAGS :=
+
+FFLAGS :=  -cpp -O3 -frounding-math -fsignaling-nans -fdefault-real-8 -fdefault-double-8 \
+	   -g -fbacktrace -I$(MODULES_OUTPUT_DIR) -J$(MODULES_OUTPUT_DIR)
+F90FLAGS := $(FFLAGS) -ffree-form -ffree-line-length-none
+FFLAGS := $(FFLAGS) -ffixed-form -ffixed-line-length-132
+else
 LDFLAGS := -Wl,-zmuldefs
 
 FFLAGS :=  -fpp -FI -O -r8 -prec-div -g -traceback \
@@ -132,6 +144,7 @@ FFLAGS :=  -fpp -FI -O -r8 -prec-div -g -traceback \
 #FFLAGS :=  -fpp -FI -r8 -prec_div -g -O2 -fpe0 -debug extended -traceback \
           -I$(MODULES_OUTPUT_DIR) -module $(MODULES_OUTPUT_DIR)
 F90FLAGS := $(FFLAGS) -FR -DIFORT
+endif
 
 
 OBJECTS :=

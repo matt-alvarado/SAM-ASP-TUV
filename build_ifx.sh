@@ -9,6 +9,8 @@
 #
 # Usage: ./build_ifx.sh            build everything
 #        ./build_ifx.sh clean      remove _build/ and OBJ/ first
+# SAMASP_FC=gfortran builds with the GNU compilers instead (gfortran/gcc, e.g.
+# on ARM64 / Apple silicon); build_gnu.sh does that.
 set -e
 cd "$(dirname "$0")"
 TOP=$PWD
@@ -16,6 +18,12 @@ TOP=$PWD
 ENV_SCRIPT=${SAMASP_ENV:-/opt/samasp-env.sh}
 [ -f "$ENV_SCRIPT" ] || { echo "Missing $ENV_SCRIPT (toolchain setup)"; exit 1; }
 source "$ENV_SCRIPT"
+FC=${SAMASP_FC:-ifx}
+case $FC in
+  ifx) CC=icx ;;
+  gfortran) CC=gcc ;;
+  *) echo "SAMASP_FC must be ifx or gfortran"; exit 1 ;;
+esac
 
 if [ "$1" = clean ]; then rm -rf "$TOP/_build" "$TOP/OBJ"; fi
 
@@ -26,15 +34,15 @@ if [ "$1" = clean ]; then rm -rf "$TOP/_build" "$TOP/OBJ"; fi
 mkdir -p _build/asp/ObjectFiles _build/asp/ModuleFiles _build/tuv
 echo "== ASP"
 (cd _build/asp && make -f "$TOP/SRC_TUV/ASP/Makefile" all \
-     ASP_BUILD_DIR="$PWD" ASP_FC=ifx > build.log 2>&1) \
+     ASP_BUILD_DIR="$PWD" ASP_FC=$FC > build.log 2>&1) \
   || { tail -20 _build/asp/build.log; exit 1; }
 echo "== TUV"
 (cd _build/tuv && make -f "$TOP/SRC_TUV/TUV/Makefile_SAM" all \
-     TUV_BUILD_DIR="$PWD" TUV_FC=ifx > build.log 2>&1) \
+     TUV_BUILD_DIR="$PWD" TUV_FC=$FC > build.log 2>&1) \
   || { tail -20 _build/tuv/build.log; exit 1; }
 
 echo "== SAM"
-export SAM_FC=ifx SAM_CC=icx
+export SAM_FC=$FC SAM_CC=$CC
 export ASP_LIBRARY_DIR=$TOP/_build/asp TUV_LIBRARY_DIR=$TOP/_build/tuv
 export LIB_MPI="$LIB_MPI_DIR -lmpi_mpifh -lmpi"
 export LIB_NETCDF="$LIB_NETCDF_DIR -lnetcdff -L$LIB_SYS -lnetcdf"

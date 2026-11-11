@@ -594,3 +594,19 @@ Timings are asptest (30 steps, 16 MPI ranks oversubscribed on this machine).
   build with. `--check-decks` checks only. Counts verified against SAM's own
   layout output: 1488 (Williams Flats), 1486 (Williams 10 bins), 4096
   (Williams 40 bins); `tests/test_run_case.py`.
+- GNU compiler build, for ARM64 / Apple silicon: `build_gnu.sh`
+  (`build_ifx.sh` with `SAMASP_FC=gfortran`); gfortran branches in the SAM,
+  ASP and TUV Makefiles (ASP: the ASP repository's gfortran flags without
+  `-m64`; all GNU code `-ffp-contract=off`; TUV `-O2`); `UTIL/build_util.sh`
+  with `SAMASP_FC=gfortran` (+ `UTIL/SRC/iargc_gnu.f`). `Dockerfile.ubi9-gnu`:
+  UBI 9 with a conda-forge gfortran 13.4 toolchain (Open MPI 4.1.6, HDF5,
+  NetCDF-C, NetCDF-Fortran), architecture-neutral. On the 72-step test case
+  (x86-64) gfortran and ifx plume means of CO, O3, NOx, PAN, HONO, OH, OA and
+  J-values agree within ~0.5%; not bit-identical. Guide:
+  `docs/Mac_AppleSilicon_CMMC_Guide.md` (RHEL 9 ARM VM in FIPS mode with
+  rootless Podman; Podman machine/Fedora CoreOS only if the ISSO accepts it).
+- Bug fixed (found by the gfortran comparison): `write_fields3D.f90`
+  declared IVOC4Gas-IVOC8Gas as (nz,ny,nzm) instead of (nx,ny,nzm), so the
+  3D output fields POA4Gas and SOA1Gas-SOA4Gas were read from the wrong
+  memory in every build since June 2024 (zeros or garbage). Model fields
+  were not affected.

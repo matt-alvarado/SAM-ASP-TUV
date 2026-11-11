@@ -46,17 +46,25 @@ PLATFORM := $(shell uname -s)
   # Compilers (FC/CC have built-in make defaults, so separate names are used)
   SAM_FC ?= ifort
   SAM_CC ?= icc
-  SAM_FFLAGS_EXTRA ?= -pad
   # Strict floating-point semantics, so results do not depend on how the
   # compiler reorders arithmetic when unrelated code changes (ASP magnifies
   # last-bit differences in its inputs). Costs ~3% of asptest wall time.
-  ifeq ($(SAM_FC),ifx)
-    SAM_FP ?= -fp-model=precise
+  # SAM_FC=gfortran (with SAM_CC=gcc) builds with GNU compilers, e.g. on ARM64.
+  ifeq ($(SAM_FC),gfortran)
+    SAM_FFLAGS_EXTRA ?= -fallow-argument-mismatch
+    SAM_FP ?= -ffp-contract=off
+    FF77 = $(SAM_FC) -c -ffixed-form -ffixed-line-length-132
+    FF90 = $(SAM_FC) -c -ffree-form -ffree-line-length-none
   else
-    SAM_FP ?= -fp-model precise
+    SAM_FFLAGS_EXTRA ?= -pad
+    ifeq ($(SAM_FC),ifx)
+      SAM_FP ?= -fp-model=precise
+    else
+      SAM_FP ?= -fp-model precise
+    endif
+    FF77 = $(SAM_FC) -c -fixed -extend_source
+    FF90 = $(SAM_FC) -c -free
   endif
-  FF77 = $(SAM_FC) -c -fixed -extend_source
-  FF90 = $(SAM_FC) -c -free
   FFLAGS = -I$(INC_NETCDF) -I$(INC_MPI) -g -O2 $(SAM_FP) $(SAM_FFLAGS_EXTRA) -I$(ASP_LIBRARY_DIR)/ModuleFiles 
 #  FFLAGS = -I$(INC_NETCDF) -I$(INC_MPI) -g -O2 -pad -fpe0 -g -traceback -debug extended -I$(ASP_LIBRARY_DIR)/ModuleFiles #AD DEBUG
 

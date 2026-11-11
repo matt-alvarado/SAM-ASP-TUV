@@ -12,6 +12,7 @@ with the Ubuntu-based image described in the
 [container user's guide](Container_User_Guide.md), which explains the model
 settings, ASP decks, ERA5, fire timing and outputs. Read that guide for
 everything about the model itself; where it says `docker`, use `podman`.
+For an Apple silicon Mac, see the [Mac guide](Mac_AppleSilicon_CMMC_Guide.md).
 
 > **This is not a compliance determination.** CMMC sets requirements, not
 > products. What is allowed on your VM is decided by your organization's

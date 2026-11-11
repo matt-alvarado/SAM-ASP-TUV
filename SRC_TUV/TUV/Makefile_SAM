@@ -54,6 +54,9 @@ FOBJS = numer.o functs.o orbit.o terint.o
 # not depend on how the compiler reorders arithmetic.
 ifeq ($(TUV_FC),ifx)
   TUV_FP ?= -fp-model=precise
+else ifeq ($(TUV_FC),gfortran)
+  # no fused multiply-add contraction (ARM64 would otherwise differ from x86-64)
+  TUV_FP ?= -O2 -ffp-contract=off -fallow-argument-mismatch
 else
   TUV_FP ?= -fp-model precise
 endif

@@ -1,0 +1,97 @@
+# syntax=docker/dockerfile:1
+# SAM-ASP-TUV on Red Hat Universal Base Image 9 (RHEL 9), built with the GNU
+# compilers (gfortran/gcc): for ARM64 machines such as Apple silicon Macs
+# (docs/Mac_AppleSilicon_CMMC_Guide.md), and for any x86-64 machine without
+# the Intel compilers. Same model, entry point and settings as Dockerfile.ubi9;
+# the build runs natively on the machine's own architecture.
+#
+# Build (the common_ASP submodule must be checked out):
+#   git submodule update --init
+#   podman build -f Dockerfile.ubi9-gnu -t sam-asp-tuv-gnu .
+# Options:
+#   --build-arg BASE=<image>       RHEL 9 base image, e.g. your organization's
+#                                  hardened UBI 9 (default: Red Hat's UBI 9.8)
+#   --build-arg NSUBDOMAINS_X=8    MPI ranks (subdomains in x; must divide 240)
+#   --build-arg NTRACERS=1486      SAM tracer count for decks other than the default
+#   --secret id=ca,src=ca.pem      extra CA certificates, for building behind a
+#                                  TLS-intercepting proxy (used during the build only)
+#
+# Where things come from:
+#   RHEL 9 (UBI repositories): the OS, Python 3.9, NumPy, requests, OpenSSL.
+#     The ERA5 download goes through these (RHEL's OpenSSL).
+#   conda-forge (pinned): gfortran and gcc 13.4, Open MPI, HDF5, NetCDF-C,
+#     NetCDF-Fortran (built with the same gfortran, so its module files match),
+#     tcsh and make for the build. Only their run-time libraries are kept.
+#   PyPI (pinned, prebuilt wheels for x86-64 and ARM64): cdsapi, netCDF4, cftime.
+# Results agree with the Intel (ifx) builds to well within the model's own
+# variability (plume means of CO, O3, NOx, PAN, OA within ~0.5% on the test
+# case), but are not bit-identical to them.
+
+ARG BASE=registry.access.redhat.com/ubi9/ubi:9.8
+
+# ---------------------------------------------------------------- toolchain
+FROM ${BASE} AS build
+ENV SSL_CERT_FILE=/etc/pki/tls/certs/ca-bundle.crt
+RUN --mount=type=secret,id=ca,required=false \
+    if [ -s /run/secrets/ca ]; then cp /run/secrets/ca /etc/pki/ca-trust/source/anchors/build-ca.pem && update-ca-trust; fi && \
+    dnf -y -q install bzip2 xz perl diffutils findutils > /dev/null && dnf clean all > /dev/null
+RUN case "$(uname -m)" in x86_64) plat=linux-64 ;; aarch64) plat=linux-aarch64 ;; \
+        *) echo "unsupported architecture $(uname -m)"; exit 1 ;; esac && \
+    mkdir -p /opt/micromamba && cd /opt/micromamba && \
+    curl -sSL https://conda.anaconda.org/conda-forge/$plat/micromamba-2.10.0-0.tar.bz2 | tar xj bin/micromamba && \
+    MAMBA_ROOT_PREFIX=/opt/micromamba ./bin/micromamba create -y -q -p /opt/deps -c conda-forge \
+        gfortran=13.4.0 gcc=13.4.0 make=4.4.1 tcsh=6.24.16 openmpi=4.1.6 \
+        'libnetcdf=4.9.3=nompi*' 'hdf5=1.14.6=nompi*' 'netcdf-fortran=4.6.2=nompi*' && \
+    rm -rf /opt/micromamba/pkgs && \
+    ln -s /opt/deps/bin/tcsh /bin/csh
+RUN printf '%s\n' \
+    'export PATH=/opt/deps/bin:$PATH' \
+    'export LIB_SYS=/opt/deps/lib' \
+    'export INC_MPI=/opt/deps/include LIB_MPI_DIR=/opt/deps/lib' \
+    'export INC_NETCDF=/opt/deps/include LIB_NETCDF_DIR=/opt/deps/lib' \
+    'export LDFLAGS_TOOLCHAIN="-Wl,-rpath,/opt/deps/lib -Wl,-rpath-link,/opt/deps/lib"' \
+    > /opt/samasp-env.sh
+
+# ---------------------------------------------------------------- model
+WORKDIR /opt/sam-asp-tuv
+COPY . .
+ARG NSUBDOMAINS_X=16
+ARG NTRACERS=
+RUN test -f SRC_TUV/ASP/src/StepASP4SAM.f90 || \
+        { echo 'ASP source missing: run "git submodule update --init" before the build'; exit 1; } && \
+    nx=$(sed -n 's/.*nx_gl *= *\([0-9]*\).*/\1/p' SRC_TUV/domain.f90 | head -1) && \
+    [ $((nx % NSUBDOMAINS_X)) -eq 0 ] || { echo "NSUBDOMAINS_X=$NSUBDOMAINS_X must divide nx_gl=$nx"; exit 1; } && \
+    sed -i "s/^\( *integer, parameter :: nsubdomains_x *= *\)[0-9]*/\1${NSUBDOMAINS_X}/" SRC_TUV/domain.f90 && \
+    if [ -n "$NTRACERS" ]; then sed -i "s/^\( *integer, parameter :: ntracers *= *\)[0-9]*/\1${NTRACERS}/" SRC_TUV/domain.f90; fi && \
+    ny=$(sed -n 's/.*nsubdomains_y *= *\([0-9]*\).*/\1/p' SRC_TUV/domain.f90 | head -1) && \
+    echo $((NSUBDOMAINS_X * ny)) > NRANKS && \
+    SAMASP_ENV=/opt/samasp-env.sh ./build_gnu.sh > /tmp/build.out 2>&1 || \
+        { tail -30 /tmp/build.out; tail -40 _build/sam_build.log 2>/dev/null; exit 1; } && \
+    SAMASP_FC=gfortran SAMASP_ENV=/opt/samasp-env.sh UTIL/build_util.sh > /dev/null && \
+    rm -rf _build OBJ
+# keep only the run-time part of the conda environment (no compilers, headers or static libraries)
+RUN cd /opt/deps && \
+    rm -rf include share/doc share/man share/info conda-meta/*.json.bak libexec lib/gcc \
+           *-conda-linux-gnu* bin/*gfortran* bin/*gcc* bin/*g++* bin/*cpp* bin/make bin/tcsh && \
+    find . -name '*.a' -delete
+
+# ---------------------------------------------------------------- runtime
+FROM ${BASE}
+ENV REQUESTS_CA_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt
+RUN --mount=type=secret,id=ca,required=false \
+    if [ -s /run/secrets/ca ]; then cp /run/secrets/ca /etc/pki/ca-trust/source/anchors/build-ca.pem && update-ca-trust; fi && \
+    dnf -y -q install python3 python3-numpy python3-requests python3-pip > /dev/null && \
+    pip3 install -q --no-cache-dir --only-binary=netCDF4,cftime,numpy cdsapi==0.7.7 netCDF4==1.6.5 cftime==1.6.4.post1 && \
+    dnf -y -q remove python3-pip > /dev/null && dnf clean all > /dev/null && rm -rf /var/cache/dnf && \
+    rm -f /etc/pki/ca-trust/source/anchors/build-ca.pem && update-ca-trust
+COPY --from=build /opt/deps /opt/deps
+COPY --from=build /opt/sam-asp-tuv /opt/sam-asp-tuv
+ENV SAMASP_HOME=/opt/sam-asp-tuv \
+    PATH=/opt/deps/bin:$PATH \
+    OPAL_PREFIX=/opt/deps \
+    CDSAPI_URL=https://cds.climate.copernicus.eu/api \
+    OMPI_MCA_btl_vader_single_copy_mechanism=none \
+    OMPI_MCA_plm=isolated
+WORKDIR /opt/sam-asp-tuv
+VOLUME ["/output"]
+ENTRYPOINT ["python3", "/opt/sam-asp-tuv/docker/run_case.py"]
