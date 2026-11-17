@@ -10,7 +10,9 @@ use tracers
 use movies, only: init_movies
 
 implicit none
-character *256 cmd
+character *1024 cmd
+character *256 file2D
+character *16 rankstr
 integer k, icyc, nn, nstatsteps
 double precision cputime, oldtime, init_time, elapsed_time !bloss wallclocktime
 double precision usrtime, systime
@@ -343,8 +345,13 @@ end do ! main loop
 
 if(masterproc) write(*,*) 'Finished with SAM, exiting...'
 if(masterproc) then
-	cmd ='mv ./OUT_3D/'//trim(case)//'_'//trim(case)//'_12.bin2D COMPLETE_RUNS_AEROSOL/'//trim(case)//'_aerosol_12.bin2D'
-	write(*,*) cmd
+	! Old (rotor) workflow: move the 2-D output to COMPLETE_RUNS_AEROSOL/, only
+	! if that directory exists. The file name carries the number of MPI ranks,
+	! as written in write_fields3D.f90 (it used to be hard-coded as 12).
+	write(rankstr,'(i0)') nsubdomains
+	file2D = './OUT_3D/'//trim(case)//'_'//trim(caseid)//'_'//trim(rankstr)//'.bin2D'
+	cmd = 'if [ -d COMPLETE_RUNS_AEROSOL ] && [ -f '//trim(file2D)//' ]; then set -x; mv '// &
+	      trim(file2D)//' COMPLETE_RUNS_AEROSOL/'//trim(case)//'_aerosol_'//trim(rankstr)//'.bin2D; fi'
 	call system(cmd)
 end if
 call task_stop()

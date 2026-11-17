@@ -619,3 +619,11 @@ Timings are asptest (30 steps, 16 MPI ranks oversubscribed on this machine).
   zip (e.g. an `ERA5_SL_FILE` downloaded by hand). Test:
   `test_cds_zip_single_levels`. The SAM `Build` script needs `csh`, which the
   cloud set-up script must install.
+- End-of-run move of the 2-D output (`main.f90`, SRC and SRC_TUV): the file
+  name had the rank count hard-coded as 12 and used `case` twice, so with 16
+  ranks the `mv` failed ("cannot stat"). It now uses `nsubdomains` and
+  `caseid`, as `write_fields3D.f90` does, and moves the file only if
+  `COMPLETE_RUNS_AEROSOL/` exists (the old rotor workflow), so the container's
+  2-D output stays in OUT_3D. Tested with the 72-step case: without the
+  directory, stat, 2-D and restart output byte-identical to the previous
+  build; with it, the file is moved.
