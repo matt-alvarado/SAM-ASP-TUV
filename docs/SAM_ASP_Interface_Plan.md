@@ -627,3 +627,6 @@ Timings are asptest (30 steps, 16 MPI ranks oversubscribed on this machine).
   2-D output stays in OUT_3D. Tested with the 72-step case: without the
   directory, stat, 2-D and restart output byte-identical to the previous
   build; with it, the file is moved.
+- `docs/cloud_setup.sh`: a copy of the cloud environment's setup script
+  (Intel ifx, Open MPI, NetCDF; now with `csh`), with the environment's network
+  allowlist in its header.

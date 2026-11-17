@@ -1,7 +1,7 @@
 #!/bin/bash
 # Build ASP, TUV and SAM with the Intel oneAPI ifx/icx compilers, Open MPI
 # and NetCDF, as installed by the "SAM-ASP" cloud environment's setup script
-# (which writes /opt/samasp-env.sh).
+# (which writes /opt/samasp-env.sh; a copy is in docs/cloud_setup.sh).
 #
 # ASP and TUV are built out of tree in _build/, so the prebuilt ifort
 # libraries, objects and modules committed under SRC_TUV/ are left untouched.
