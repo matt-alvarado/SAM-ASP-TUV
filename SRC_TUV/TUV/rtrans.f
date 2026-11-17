@@ -141,19 +141,7 @@
 
 *_______________________________________________________________________
 
-      ! start MM DEBUG BLOCK
-      IF (lsamvb) THEN
-      WRITE(*,*) "rtlink:L138 start"
-      ENDIF
-      IF (lsamvb) THEN
-      WRITE(*,*) "shape(dtaer) = ", shape(dtaer)
-      ENDIF
-      IF (lsamvb) THEN
-      WRITE(*,*) "shape(omaer) = ", shape(omaer)
-      ENDIF
-      IF (lsamvb) THEN
-      WRITE(*,*) "shape(gaer) = ", shape(gaer)
-      ENDIF
+* report aerosol optics outside their physical range
       IF ( ANY( dtaer <= 0) ) THEN
          WRITE(*,*) "dtaer has a bad value <= 0"
          WRITE(*,*) "dtaer = ", dtaer
@@ -168,7 +156,6 @@
          WRITE(*,*) "gaer has a bad value < -1.0 OR > 1.0"
          WRITE(*,*) "gaer = ", gaer
       ENDIF
-      ! end MM DEBUG BLOCK
       
 * initialize:
 
@@ -248,9 +235,7 @@
 
  10   CONTINUE
 
-      IF (lsamvb) THEN
-      WRITE(*,*) "Before RT routine", nstr
-      ENDIF
+      IF (lsamvb) WRITE(*,*) "Before RT routine", nstr
 * call rt routine:
 
       IF( nstr .LT. 2 ) THEN
@@ -271,9 +256,7 @@
      $        sindir, sinup, sindn)
 
       ENDIF
-      IF (lsamvb) THEN
-      WRITE(*,*) "After RT routine"
-      ENDIF
+      IF (lsamvb) WRITE(*,*) "After RT routine"
 * output (invert z-coordinate)
 
       DO 20 i = 1, nz
@@ -1281,50 +1264,23 @@ c     ..
 
 
 
-      IF (lsamvb) THEN
-      write(*,*) "PSNDO Check 1", PASS1
-      ENDIF
 
       IF( PASS1 ) THEN
-      IF (lsamvb) THEN
-         write(*,*) "PSNDO Check 1.3", PASS1, epsilon(4.)
-      ENDIF
-         call flush(6)
          !DITHER = 10.*R1MACH( 4 ) !MJA this function is hangling for some reason, replace with F90 version
 
          DITHER = epsilon(4.)
-      IF (lsamvb) THEN
-         write(*,*) "PSNDO Check 1.5", DITHER
-      ENDIF
-         call flush(6)
 c                            ** Must dither more on Cray (14-digit prec)
 
          IF( DITHER.LT.1.E-10 ) DITHER = 10.*DITHER
-      IF (lsamvb) THEN
-         write(*,*) "PSNDO Check 1.7", DITHER
-      ENDIF
-         call flush(6)
          RPD  = PI / 180.0
          PASS1 = .FALSE.
-      IF (lsamvb) THEN
-         write(*,*) "PSNDO Check 1.9", DITHER
-      ENDIF
-         call flush(6)
       END IF
-      IF (lsamvb) THEN
-      write(*,*) "PSNDO Check 1.95", DITHER
-      ENDIF
-      call flush(6)
    10 CONTINUE
 
 c                                  ** Calculate cumulative optical depth
 c                                     and dither single-scatter albedo
 c                                     to improve numerical behavior of
 c                                     eigenvalue/vector computation
-      IF (lsamvb) THEN
-      write(*,*) "PSNDO Check 2"
-      ENDIF
-      call flush(6)
       CALL ZEROIT( TAUC, MXCLY + 1 )
 
       DO 20 LC = 1, NLYR
@@ -1334,9 +1290,6 @@ c                                     eigenvalue/vector computation
 
    20 CONTINUE
 c                                ** Check input dimensions and variables
-      IF (lsamvb) THEN
-      write(*,*) "PSNDO Check 3"
-      ENDIF
       CALL CHEKIN( NLYR, DTAUC, SSALB, PMOM, TEMPER, WVNMLO, WVNMHI,
      &             USRTAU, NTAU, UTAU, NSTR, USRANG, NUMU, UMU, NPHI,
      &             PHI, IBCND, FBEAM, UMU0, PHI0, FISOT, LAMBER, ALBEDO,
@@ -1345,9 +1298,6 @@ c                                ** Check input dimensions and variables
      &             MXUMU, MXCMU, MXPHI )
 
 c                                 ** Zero internal and output arrays
-      IF (lsamvb) THEN
-      write(*,*) "PSNDO Check 4"
-      ENDIF
       CALL  ZEROAL( MXCLY, EXPBEA(1), FLYR, OPRIM, TAUCPR(1), XR0, XR1,
      $              MXCMU, CMU, CWT, PSI, WK, Z0, Z1, ZJ,
      $              MXCMU+1, HLPR, YLM0,
@@ -1369,9 +1319,6 @@ c                                 ** Zero internal and output arrays
      $              MAXUMU*MAXULV*MAXPHI, UU )
 
 c                                 ** Perform various setup operations
-      IF (lsamvb) THEN
-      write(*,*) "PSNDO Check 5"
-      ENDIF
       CALL SETDIS( dsdh, nid, tausla, tauslau, mu2,
      &             CMU, CWT, DELTAM, DTAUC, DTAUCP, EXPBEA, FBEAM, FLYR,
      &             GL, HL, HLPR, IBCND, LAMBER, LAYRU, LYRCUT, MAXUMU,
@@ -1380,9 +1327,6 @@ c                                 ** Perform various setup operations
      &             UTAUPR, UMU, UMU0, USRTAU, USRANG )
 
 c                                 ** Print input information
-      IF (lsamvb) THEN
-      write(*,*) "PSNDO Check 6"
-      ENDIF
       IF ( PRNT(1) )
      $     CALL PRTINP( NLYR, DTAUC, DTAUCP, SSALB, PMOM, TEMPER,
      $                  WVNMLO, WVNMHI, NTAU, UTAU, NSTR, NUMU, UMU,
@@ -1402,9 +1346,6 @@ c                                   ** Calculate Planck functions
 
 c ========  BEGIN LOOP TO SUM AZIMUTHAL COMPONENTS OF INTENSITY  =======
 c           (EQ STWJ 5)
-      IF (lsamvb) THEN
-      write(*,*) "PSNDO Check 7"
-      ENDIF
       KCONV  = 0
       NAZ  = NSTR - 1
 c                                    ** Azimuth-independent case
@@ -1462,9 +1403,6 @@ c                                    and emissivity properties
 
 
 c ===================  BEGIN LOOP ON COMPUTATIONAL LAYERS  =============
-      IF (lsamvb) THEN
-      write(*,*) "PSNDO Check 8"
-      ENDIF
          DO 60 LC = 1, NCUT
 
             CALL SOLVEC( AMB, APB, ARRAY, CMU, CWT, GL( 0,LC ), MI,
@@ -1483,27 +1421,18 @@ c ===================  END LOOP ON COMPUTATIONAL LAYERS  ===============
 
 c                      ** Set coefficient matrix of equations combining
 c                         boundary and layer interface conditions
-      IF (lsamvb) THEN
-      write(*,*) "PSNDO Check 9"
-      ENDIF
          CALL SETMTX( BDR, CBAND, CMU, CWT, DELM0, DTAUCP, GC, KK,
      &                LAMBER, LYRCUT, MI, MI9M2, MXCMU, NCOL, NCUT,
      &                NNLYRI, NN, NSTR, TAUCPR, WK )
 
 c                      ** Solve for constants of integration in homo-
 c                         geneous solution (general boundary conditions)
-      IF (lsamvb) THEN
-      write(*,*) "PSNDO Check 10"
-      ENDIF
          CALL SOLVE0( B, BDR, BEM, BPLANK, CBAND, CMU, CWT, EXPBEA,
      &                FBEAM, FISOT, IPVT, LAMBER, LL, LYRCUT, MAZIM, MI,
      &                MI9M2, MXCMU, NCOL, NCUT, NN, NSTR, NNLYRI, PI,
      &                TPLANK, TAUCPR, UMU0, Z, ZZ, ZPLK0, ZPLK1 )
 
 c                                  ** Compute upward and downward fluxes
-      IF (lsamvb) THEN
-      write(*,*) "PSNDO Check 11"
-      ENDIF
       IF ( MAZIM.EQ.0 )
      $     CALL FLUXES( tausla, tauslau,
      $                  CMU, CWT, FBEAM, GC, KK, LAYRU, LL, LYRCUT,
@@ -1599,9 +1528,6 @@ c                                   cosine series);  Eq SD(2)
 
 c ===================  END LOOP ON AZIMUTHAL COMPONENTS  ===============
 
-      IF (lsamvb) THEN
-      write(*,*) "PSNDO Check 12"
-      ENDIF
 c                                          ** Print intensities
   170 CONTINUE
       IF( PRNT( 5 ) .AND. .NOT.ONLYFL ) CALL PRTINT( UU, UTAU, NTAU,

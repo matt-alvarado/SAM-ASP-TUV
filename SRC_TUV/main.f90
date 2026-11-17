@@ -8,7 +8,6 @@ use microphysics
 use sgs
 use tracers
 use movies, only: init_movies
-use params, only: samasp_verbose
 
 implicit none
 character *1024 cmd
@@ -294,19 +293,15 @@ do while(nstep.lt.nstop.and.nelapse.gt.0)
 !----------------------------------------------------------
 
 ! Rotate the dynamic tendency arrays for Adams-bashforth scheme:
-      if (samasp_verbose) write(*,*) "IN MAIN.F90 L294"
       nn=na
       na=nc
       nc=nb
       nb=nn
    end do ! icycle	
-      if (samasp_verbose) write(*,*) "IN MAIN.F90 L300"
   total_water_after = total_water()
 !----------------------------------------------------------
 !  collect statistics, write save-file, etc.
-if (samasp_verbose) write(*,*) "IN MAIN.F90 L304"
    call stepout(nstatsteps)
-if (samasp_verbose) write(*,*) "IN MAIN.F90 L306 after stepout"  
 !----------------------------------------------------------
 !----------------------------------------------------------
 
