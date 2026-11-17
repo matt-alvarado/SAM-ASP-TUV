@@ -1,0 +1,62 @@
+* TUV set-up that tuv4samasp keeps between calls. tuv_setup fills it on
+* the first call (input file, grids, atmosphere, spectral data, optical
+* depths that do not change); every call then uses it with SAM's time
+* and aerosol profile. Include after 'params'.
+
+* Input file options and output selections (see tuv_setup and rdinp)
+
+      INTEGER nstr, nt, iout
+      INTEGER isfix, ijfix, itfix, iwfix, izout
+      INTEGER nms, ims(ks), nmj, imj(kj)
+      LOGICAL lzenit, lirrad, laflux, lrates, ljvals, lmmech
+      REAL tmzone, tstop
+      REAL tauaer, ssaaer, alpha
+      REAL dirsun, difdn, difup
+
+* Altitude grid (km) and wavelength grid (bin edges and centres, nm)
+
+      INTEGER nz, nw
+      REAL z(kz), wl(kw), wc(kw), wu(kw)
+
+* Planetary boundary layer pollutants (none if zpbl < 0)
+
+      INTEGER ipbl
+      REAL zpbl, aod330
+
+* Temperature, air density and air column profiles, extraterrestrial
+* flux, O2 cross section (for la_srb), surface albedo
+
+      REAL tlev(kz), aircon(kz), aircol(kz)
+      REAL f(kw), o2xs1(kw), albedo(kw)
+
+* Spectral weighting functions and photolysis cross sections x quantum
+* yields (sj(1,*,*), O2, is reset on every call by sjo2)
+
+      INTEGER ns, nj
+      REAL sw(ks,kw), sj(kj,kz,kw)
+
+* Optical depths, single scattering albedos and asymmetry factors that
+* do not change between calls (dto2s: O2 before la_srb)
+
+      REAL dtrl(kz,kw), dto2s(kz,kw), dto3(kz,kw)
+      REAL dtso2(kz,kw), dtno2(kz,kw)
+      REAL dtcld(kz,kw), omcld(kz,kw), gcld(kz,kw)
+      REAL dtsnw(kz,kw), omsnw(kz,kw), gsnw(kz,kw)
+
+* Output file name and labels of weighting functions and reactions
+
+      CHARACTER*6 outfil
+      CHARACTER*50 slabel(ks), jlabel(kj)
+
+      COMMON /tuvset/ nstr, nt, iout, isfix, ijfix, itfix, iwfix,
+     $     izout, nms, ims, nmj, imj,
+     $     lzenit, lirrad, laflux, lrates, ljvals, lmmech,
+     $     tmzone, tstop, tauaer, ssaaer, alpha,
+     $     dirsun, difdn, difup,
+     $     nz, nw, z, wl, wc, wu, ipbl, zpbl, aod330,
+     $     tlev, aircon, aircol, f, o2xs1, albedo,
+     $     ns, nj, sw, sj,
+     $     dtrl, dto2s, dto3, dtso2, dtno2,
+     $     dtcld, omcld, gcld, dtsnw, omsnw, gsnw
+      COMMON /tuvsetc/ outfil, slabel, jlabel
+      SAVE /tuvset/, /tuvsetc/

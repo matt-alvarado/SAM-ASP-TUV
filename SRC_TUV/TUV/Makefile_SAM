@@ -19,6 +19,7 @@ TUV_BUILD_DIR ?= $(TUV_DIR)
 TUV_LIB = $(TUV_BUILD_DIR)/libTuvLibrary.a
 vpath %.f $(TUV_DIR)
 vpath params $(TUV_DIR)
+vpath tuvstate $(TUV_DIR)
 AR = ar
 AR_FLAGS = -rv
 
@@ -75,6 +76,9 @@ $(EXC):		$(FOBJS) $(USE_INCL)
 		$(FC) $(FFLAGS) $(TUV_FP) $(FOBJS) $(USE_INCL) $(LIBS) -o $@
 
 $(USE_INCL):	$(INCLUDES)
+
+# TUV set-up kept between tuv4samasp calls (common blocks)
+TUV4SAMASP.o:	tuvstate
 
 .f.o:		
 		$(FC) $(FFLAGS) $(TUV_FP) -I$(TUV_DIR) -c $<

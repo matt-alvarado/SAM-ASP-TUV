@@ -104,69 +104,49 @@
 * the centres (nm) of the samnw wavelength bins of the aerosol inputs
       INTEGER, INTENT(OUT) :: samnz, samnw
       REAL*8, INTENT(OUT) :: samwc(kw)
-      INTEGER :: nupper
       LOGICAL, PARAMETER :: lsamout = .FALSE.
 * SAM-ASP: the set-up that does not change between calls (input file,
-* grids, atmosphere, spectral data, fixed optical depths) is done on the
-* first call only. All local variables are SAVEd so it is reused; only
-* the time (solar position) and the aerosol profile change between calls.
+* grids, atmosphere, spectral data, fixed optical depths) is done by
+* tuv_setup on the first call and kept in the common blocks of
+* 'tuvstate'; only the time (solar position) and the aerosol profile
+* change between calls. Everything else here is recomputed every call.
+      INCLUDE 'tuvstate'
       LOGICAL tuvinit
       DATA tuvinit /.FALSE./
-      REAL dto2s(kz,kw)
-      SAVE
-      REAL :: ztopsam, dzup
+      SAVE tuvinit
 
-* Wavelength grid:
+* Time and date of this call (from SAM)
 
-      INTEGER nw, iw, nwint
-      REAL wl(kw), wc(kw), wu(kw)
-      REAL wstart, wstop
+      INTEGER iyear, imonth, iday
+      INTEGER it
+      REAL t(kt), tstart
+      REAL lat, lon
 
-* Altitude grid
+* Loop indices
 
-      INTEGER nz, nzm1, iz, izout
-      REAL z(kz), zstart, zstop, zout
+      INTEGER iw, iz, is, ij
 
-* Solar zenith angle and azimuth
+* Solar zenith angle
 * slant pathlengths in spherical geometry
 
       REAL sza(kt), zen
       INTEGER nid(0:kz)
       REAL dsdh(0:kz,kz)
+      REAL vcol(kz), scol(kz)
 
 * Extra terrestrial solar flux and earth-Sun distance ^-2
 
-      REAL f(kw), etf(kw)
+      REAL etf(kw)
       REAL esfact(kt)
 
-* Ozone absorption cross section
+* O2 absorption cross section and optical depths (Lyman-alpha and
+* Schumann-Runge bands depend on the zenith angle)
 
-      INTEGER mabs
-      REAL o3xs(kz,kw)
+      REAL o2xs(kz,kw), dto2(kz,kw)
 
-* O2 absorption cross section
+* Aerosols, and any additional absorber or scatterer
 
-      REAL o2xs(kz,kw), o2xs1(kw)
-
-* SO2 absorption cross section
-     
-      REAL so2xs(kw)
-
-* NO2 absorption cross section
-     
-      REAL no2xs(kz,kw)
-
-* Atmospheric optical parameters
-
-      REAL tlev(kz), tlay(kz)
-      REAL aircon(kz), aircol(kz), vcol(kz), scol(kz)
-      REAL dtrl(kz,kw)
-      REAL co3(kz)
-      REAL dto3(kz,kw), dto2(kz,kw), dtso2(kz,kw), dtno2(kz,kw)
-      REAL dtcld(kz,kw), omcld(kz,kw), gcld(kz,kw)
       REAL dtaer(kz,kw), omaer(kz,kw), gaer(kz,kw)
-      REAL dtsnw(kz,kw), omsnw(kz,kw), gsnw(kz,kw)
-      REAL albedo(kw)
       REAL dt_any(kz,kw), om_any(kz,kw), g_any(kz,kw)
 
 * Spectral irradiance and actinic flux (scalar irradiance)
@@ -176,92 +156,31 @@
       REAL fdir(kz), fdn(kz), fup(kz)
       REAL saflux(kz,kw)
 
-* Spectral weighting functions and weighted radiation
+* Weighted radiation and photolysis coefficients (j-values)
 
-      INTEGER ns, is
-      REAL sw(ks,kw), rate(ks,kz), dose(ks)
+      REAL rate(ks,kz), dose(ks)
       REAL drdw
-      CHARACTER*50 slabel(ks)
-
-* Photolysis coefficients (j-values)
-
-      INTEGER nj, ij
-      REAL sj(kj,kz,kw), valj(kj,kz)
+      REAL valj(kj,kz)
       REAL djdw
-      CHARACTER*50 jlabel(kj)
-      INTEGER tpflag(kj)
 
-**** Re-scaling factors (can be read from input file)
-* New surface albedo and surface pressure (milli bar)
-* Total columns of O3, SO2, NO2 (Dobson Units)
-* Cloud optical depth, altitude of base and top
-* Aerosol optical depth at 550 nm, single scattering albedo, Angstrom alpha
+* Per-call progress messages (tuv_set_verbose)
 
-      REAL alsurf, psurf
-      REAL o3_tc, so2_tc, no2_tc
-      REAL taucld, zbase, ztop
-      REAL tauaer, ssaaer, alpha
-
-* Location: Lat and Lon (deg.), surface elev (km)
-* Altitude, temperature and pressure for specific outputs
-
-      REAL lat, lon
-      REAL zaird, ztemp
-
-* Time and/or solar zenith angle
-      
-      INTEGER iyear, imonth, iday
-      INTEGER it, nt
-      REAL t(kt), tstart, tstop
-      REAL tmzone
-      LOGICAL lzenit
-
-* number of radiation streams
-
-      INTEGER nstr
       LOGICAL lsamvb
       COMMON /samvrb/ lsamvb
-
-* input/output control
-
-      LOGICAL intrct
-      CHARACTER*6 inpfil, outfil
-
-      INTEGER iout
-
-      REAL dirsun, difdn, difup
 
       CHARACTER*1 again
 
 * Save arrays for output:
-
-      LOGICAL lirrad, laflux, lrates, ljvals, lmmech
-      INTEGER isfix, ijfix, itfix, izfix, iwfix
-      INTEGER nms, ims(ks), nmj, imj(kj)
 
       REAL svj_zj(kz,kj), svj_tj(kt,kj), svj_zt(kz,kt)
       REAL svr_zs(kz,ks), svr_ts(kt,ks), svr_zt(kz,kt)
       REAL svf_zw(kz,kw), svf_tw(kt,kw), svf_zt(kz,kt)
       REAL svi_zw(kz,kw), svi_tw(kt,kw), svi_zt(kz,kt)
 
-* Planetary boundary layer height and pollutant concentrations
-
-      INTEGER ipbl
-      REAL zpbl
-      REAL o3pbl, so2pbl, no2pbl, aod330
-
-* WRF-Chem output control
-
-      LOGICAL wrfchm
-
 ***** Surface waters (lakes, ocean)
-*   sdom = spectral absorption by Dissolved Organic Matter (DOM) 
-*          in lakes and ocean
-*   h2oabs = sdom at specific wavenght
+*   h2oabs = spectral absorption by Dissolved Organic Matter (DOM)
+*            at a specific wavelength
 
-      INTEGER jdom, jd
-      CHARACTER*50 dlabel(kdom)
-      REAL sdom(kdom,kw)
       REAL h2oabs
 
 *     ydepth = depth in meters
@@ -289,48 +208,438 @@
       REAL wratei, wrate0
       REAL wdosei, wdose0
 
-****** Other user-defined variables here:
-
-* spectrum locator indices:
-
-      integer js_dna, js_uvi, jd_dom
-      integer id
-
-
 * --- END OF DECLARATIONS ---------------------------------------------
-      dtaer = 1e-10            !MM DEBUG
-      omaer = 0.99             !MM DEBUG
-      gaer = 0.61            !MM DEBUG
-      
-      ! start MM DEBUG BLOCK
-      !write(*,*) "tuv4samasp:L269 beginning of code" 
-      !WRITE(*,*) "shape(samAOD) = ", shape(samAOD)
-      !WRITE(*,*) "shape(samSSA) = ", shape(samSSA)
-      !WRITE(*,*) "shape(samASYM) = ", shape(samASYM)
-      !IF ( ANY( samAOD <= 0) ) then
-      !   WRITE(*,*) "samAOD has a bad value <= 0"
-      !   WRITE(*,*) "samAOD = ", samAOD
-      !END IF
-                
-      !IF ( ANY( samSSA < 0) .OR. ANY(samSSA > 1.0)) then
-      !   WRITE(*,*) "samSSA has a bad value < 0 OR > 1.0"
-      !   WRITE(*,*) "samSSA = ", samSSA
-      !END IF
-                
-      !IF ( ANY( samASYM < -1.0) .OR. ANY(samASYM > 1.0)) then
-      !   WRITE(*,*) "samASYM has a bad value < -1.0 OR > 1.0"
-      !   WRITE(*,*) "samASYM = ", samASYM
-      !END IF
-      ! end MM DEBUG BLOCK
+* Aerosol defaults where neither TUV nor SAM sets a value
+      dtaer = 1e-10
+      omaer = 0.99
+      gaer = 0.61
 
 * re-entry point
 
  1000 CONTINUE
 
+      IF (.NOT. tuvinit) THEN
+         CALL tuv_setup(nsamz, samzi)
+         tuvinit = .TRUE.
+      ENDIF
+* ---- end of the one-time set-up; the rest is done on every call ----
+
+* time, site and date from SAM, and the solar position
+      tstart = samtstart
+      lat = REAL(samlat)
+      lon = REAL(samlon)
+      iyear = samyear
+      imonth = sammonth
+      iday = samday
+      CALL gridt(lat, lon, tmzone,
+     $     iyear, imonth, iday,
+     $     lzenit, tstart, tstop,
+     $     nt, t, sza, esfact)
+
+* O2 optical depths from the set-up (la_srb changes dto2 on every call)
+      DO iw = 1, kw
+         DO iz = 1, kz
+            dto2(iz,iw) = dto2s(iz,iw)
+         ENDDO
+      ENDDO
+
+* aerosols: TUV's default profile, with SAM-ASP's in SAM's layers
+      CALL setaer(ipbl, zpbl, aod330,
+     $     tauaer, ssaaer, alpha,
+     $     nz, z, nw, wl,
+     $     dtaer, omaer, gaer)
+
+*     !MJA 20190616 Overwrite the bottom of the aerosol profile with the SAM-ASP output  
+*     !Loop over SAM-ASP heights and wavelengths
+*     !NOTE: SAM-ASP alt and wv grid and TUV alt and wv grid must match exactly!    
+      do iz = 1, nsamz
+        do iw = 1, nw-1
+            !write(*,*) "iz: ", iz, "iw:", iw
+            dtaer(iz, iw) = samAOD(iz,iw) 
+            omaer(iz,iw) = samSSA(iz,iw)
+            gaer(iz,iw) = samASYM(iz,iw)
+        enddo
+      enddo
+ 
+      ! MM DEBUG
+      ! loop over all layers   
+      do iz = 1, kz
+        do iw = 1, kw      
+        !Force non-zero values to protect against input errors
+           if (dtaer(iz, iw) .LE. 1.0e-20) dtaer(iz, iw) = 1.0e-20
+           if (omaer(iz, iw) .LE. 1.0e-20) omaer(iz, iw) = 0.99
+           if (ABS(gaer(iz,iw)) .LE. 1.0e-20) gaer(iz,iw) = 0.61
+        enddo
+      enddo
+
+      !Fix top layer, at every wavelength (this used to run after the
+      !iw loop had ended, i.e. with iw = kw+1, out of bounds)
+      !(the top layer is nz-1; it used to be fixed at 193)
+      do iw = 1, kw
+      !dtaer(nz-1, iw) = 0.0
+      dtaer(nz-1, iw) = 1.0E-20 ! MM DEBUG
+      omaer(nz-1,iw) = 1.0
+      gaer(nz-1,iw) = 0.0
+      enddo
+
+* Set any additional absorber or scatterer:
+* Must populate dt_any(kz,kw), om_any(kz,kw), g_any(kz,kw) manually
+* This allows user to put in arbitrary absorber or scatterer
+* could write a subroutine, e.g.:
+C      CALL setany(nz,z,nw,wl,aircol, dt_any,om_any, g_any)
+* or write manually here.
+
+      DO iz = 1, nz-1
+         DO iw = 1, nw-1
+c            dt_any(iz,iw) = 0.79*aircol(iz) * 2.e-17 ! N2 VUV absorption
+            dt_any(iz,iw) = 0.
+            om_any(iz,iw) = 0.
+            g_any(iz,iw) = 0.
+         ENDDO
+      ENDDO
+
+* ___ SECTION 6: TIME/SZA LOOP  _____________________________________
+
+* Initialize any time-integrated quantities here
+
+      adose = 0.
+      wdose0 = 0.
+      wdosei = 0.
+      CALL zero1(dose,ks)
+
+* Loop over time or solar zenith angle (zen):
+
+      DO 20, it = 1, nt
+
+         zen = sza(it)
+
+         WRITE(*,200) it, zen, esfact(it)
+      IF (lsamvb) THEN
+         WRITE(kout,200) it, zen, esfact(it)
+      ENDIF
+ 200     FORMAT('step = ', I4,' sza = ', F9.3, 
+     $        ' Earth-sun factor = ', F10.7)
+
+* correction for earth-sun distance
+
+         DO iw = 1, nw - 1
+            etf(iw) = f(iw) * esfact(it)
+         ENDDO
+
+* ____ SECTION 7: CALCULATE ZENITH ANGLE-DEPENDENT QUANTITIES __________
+
+* slant path lengths for spherical geometry
+
+         CALL sphers(nz,z,zen, dsdh,nid)
+         CALL airmas(nz, dsdh,nid, aircol,vcol,scol)
+
+* Recalculate effective O2 optical depth and cross sections for Lyman-alpha
+* and Schumann-Runge bands, must know zenith angle
+* Then assign O2 cross section to sj(1,*,*)
+
+         CALL la_srb(nz,z,tlev,nw,wl,vcol,scol,o2xs1,
+     $        dto2,o2xs)
+         CALL sjo2(nz,nw,o2xs,1, sj)
+
+* ____ SECTION 8: WAVELENGTH LOOP ______________________________________
+
+
+* initialize for wavelength integration
+
+         CALL zero2(rate,ks,kz)
+         CALL zero2(valj,kj,kz)
+         wrate0 = 0.
+         wratei = 0.
+
+***** Main wavelength loop:
+      IF (lsamvb) THEN
+         write(*,*) "Before Wavelength Loop"
+      ENDIF
+         DO 10, iw = 1, nw-1
+
+** monochromatic radiative transfer. Outputs are:
+*  normalized irradiances     edir(iz), edn(iz), eup(iz) 
+*  normalized actinic fluxes  fdir(iz), fdn(zi), fup(iz)
+*  where 
+*  dir = direct beam, dn = down-welling diffuse, up = up-welling diffuse
+      IF (lsamvb) THEN
+            write(*,*) "Before rtlink"
+      ENDIF
+            CALL rtlink(nstr, nz,
+     $           iw, albedo(iw), zen,
+     $           dsdh,nid,
+     $           dtrl,
+     $           dto3,
+     $           dto2,
+     $           dtso2,
+     $           dtno2,
+     $           dtcld, omcld, gcld,
+     $           dtaer,omaer,gaer,
+     $           dtsnw,omsnw,gsnw,
+     $           dt_any,om_any,g_any,
+     $           edir, edn, eup, fdir, fdn, fup)
+      IF (lsamvb) THEN
+                 write(*,*) "After rtlink"
+      ENDIF
+* Spectral irradiance, W m-2 nm-1
+* for downwelling only, use difup = 0.
+
+            DO iz = 1, nz
+               sirrad(iz,iw) = etf(iw) * 
+     $           (dirsun*edir(iz) + difdn*edn(iz) + difup*eup(iz))
+            ENDDO
+
+* Spectral actinic flux, quanta s-1 nm-1 cm-2, all directions:
+*    units conversion:  1.e-4 * (wc*1e-9) / hc
+
+            DO iz = 1, nz
+               saflux(iz,iw) = etf(iw) * (1.e-13 * wc(iw) / hc) *
+     $              (dirsun*fdir(iz) + difdn*fdn(iz) + difup*fup(iz))
+            ENDDO
+
+*** Accumulate weighted integrals over wavelength, at all altitudes:
+
+            DO iz = 1, nz
+
+* Weighted irradiances (dose rates) W m-2
+
+               DO is = 1, ns
+                  drdw = sirrad(iz,iw) * sw(is,iw) 
+                  rate(is,iz) = rate(is,iz) + drdw * (wu(iw) - wl(iw))
+               ENDDO
+
+* Photolysis rate coefficients (J-values) s-1
+
+               DO ij = 1, nj
+                  djdw = saflux(iz,iw) * sj(ij,iz,iw)
+                  valj(ij,iz) = valj(ij,iz) + djdw * (wu(iw) - wl(iw))
+               ENDDO
+
+            ENDDO
+
+************ In-water radiation:
+*   Input:  
+*     ydepth, in meters, for which radiation field is desired
+*     h2oabs = absorption coeff of DOM in H2O at this wavelength, 1/meter
+*     zen = solar zenith angle
+*   Output from subroutine waters:
+*     se_0 = solar beam irradiance just below surface
+*     de_0 = diffuse irradiance just below surface (sum over all angles)
+*     se_y = solar beam irradiance at ydepth
+*     de_y = diffuse irradiance at ydepth  (sum over all angles)
+*     se_i = integral of solar beam irradiance from surface to ydepth 
+*     de_i = integral of diffuse irradiance from surface to ydepth
+
+!            ydepth = 1.
+!            h2oabs = sdom(jd_dom,iw)
+!            CALL waters(zen,h2oabs,ydepth, 
+!     $           se_0,de_0,se_y,de_y,se_int,de_int)
+            
+* calculate spectral irradiances in water:
+* irradiance just below air-water interface:
+
+!            we_0 = etf(iw) * (se_0*edir(1)*dirsun + 
+!     $           de_0*edn(1)*difdn)
+
+* average spectral irradiance in water, from 0 to ydepth = integral / ydepth
+
+!            we_int = etf(iw) * (se_int*edir(1)*dirsun + 
+!     $           de_int*edn(1)*difdn) / ydepth
+
+* calculate DNA-weighted irradiance, just below surface and
+* averaged from 0 to ydepth
+
+!            drdw = we_0 * sw(js_dna,iw)
+!            wrate0 = wrate0 + drdw * (wu(iw)-wl(iw))
+
+!            drdw = we_int * sw(js_dna,iw)
+!            wratei = wratei + drdw * (wu(iw)-wl(iw))
+               
+
+**** Save irradiances and actinic fluxes for output
+
+!            CALL saver1(it, itfix, iw, iwfix,  nz, izout,
+!     $           sirrad, saflux,
+!     $           svi_zw, svf_zw, svi_zt, svf_zt, svi_tw, svf_tw)
+ 10      CONTINUE
+
+*^^^^^^^^^^^^^^^^ end wavelength loop
+
+**** integrate doses over time: 
+* adose = dose in air just above surface
+* wdose0 = dose in water just below surface
+* wdosei = dose averaged over ydepth
+
+         adose = adose + 
+     $        rate(13,1) * 3600.* (tstop - tstart)/float(nt-1)
+         wdose0 = wdose0 + 
+     $        wrate0 * 3600.* (tstop - tstart)/float(nt-1)
+         wdosei = wdosei + 
+     $        wratei * 3600.* (tstop - tstart)/float(nt-1)
+
+* Save dose rates and j-values for output
+
+         CALL saver2(it,itfix, nz,izout, ns,isfix,ims, nj,ijfix,imj,
+     $        rate, valj,
+     $        svr_zs, svj_zj, svr_zt, svj_zt, svr_ts, svj_tj)
+
+    !Pass back the J-values of the selected reactions and their labels;
+    !the mapping to ASP's photolysis columns is done in SAM
+    !(samasp_photo.f90, PhotoMap.in)
+         samvalj(:,:) = 0.0
+         samnj = nmj
+         samnz = nz
+         samnw = nw - 1
+         samwc(:) = 0.0
+         do iw = 1, nw-1
+            samwc(iw) = wc(iw)
+         enddo
+         do ij = 1, nmj
+            samjlabel(ij) = jlabel(imj(ij))
+            do iz = 1, nz
+                samvalj(ij,iz) = valj(imj(ij),iz)
+            enddo
+         enddo
+ 20   CONTINUE
+
+* output in-water doses
+
+!      write(*,222) adose, wdose0, wdosei, dlabel(jd_dom)
+! 222  format(3(0pf10.4,1x),a50)
+
+**output all Js at zout
+
+c      do iz = 1, nz
+c         if(z(iz) .eq. zout) then
+c            do ij = 1, nj
+c               write(44,444) valj(ij,iz), jlabel(ij)
+c            enddo
+c         endif
+c      enddo
+c 444  format(1pe11.4,1x,a50)
+*^^^^^^^^^^^^^^^^ end time/zenith loop
+
+* ____ SECTION 9: OUTPUT ______________________________________________
+
+* SAM-ASP: TUV's own output file is not needed (the J-values are returned
+* to SAM) and outpt1 rewrote ../<outfil>.txt, outside the run directory,
+* on every call. Set lsamout = .TRUE. to write it again.
+      IF (lsamout) call outpt1( outfil, iout, 
+     $     lirrad, laflux, lrates, ljvals, lmmech, lzenit,
+     $     nms, ims, nmj, imj,
+     $     nz, z, tlev, aircon, izout,
+     $     nw, wl, etf, iwfix,
+     $     nt, t, sza, itfix,
+     $     ns, slabel, isfix, nj, jlabel, ijfix,
+     $     svj_zj, svj_tj, svj_zt,
+     $     svr_zs, svr_ts, svr_zt,
+     $     svf_zw, svf_tw, svf_zt,
+     $     svi_zw, svi_tw, svi_zt )
+
+ 30   continue
+
+*_______________________________________________________________________
+
+!      IF(intrct) THEN
+!         WRITE(*,*) 'do you want to do another calculation?'
+!         WRITE(*,*) 'y = yes'
+!         WRITE(*,*) 'any other key = no'
+!         READ(*,1001) again
+! 1001    FORMAT(A1)
+!         IF(again .EQ. 'y' .OR. again .EQ. 'Y') GO TO 1000
+!      ENDIF
+
+!      CLOSE(iout)
+      CLOSE(kout)
+      END SUBROUTINE tuv4samasp
+
+*=============================================================================*
+* One-time set-up for tuv4samasp: reads the TUV input file, sets the
+* altitude grid (SAM's layer interfaces samzi, km, then levels about 1 km
+* apart up to zstop), the wavelength grid, the temperature, air and ozone
+* profiles, the spectral data and the optical depths that do not change
+* between calls. The results are kept in the common blocks of 'tuvstate'.
+      SUBROUTINE tuv_setup(nsamz, samzi)
+
+      IMPLICIT NONE
+
+      INCLUDE 'params'
+      INCLUDE 'tuvstate'
+
+      INTEGER, INTENT(IN) :: nsamz
+      REAL*8, INTENT(IN) :: samzi(nsamz+1)
+      INTEGER nupper
+      REAL ztopsam, dzup
+
+* Wavelength grid:
+
+      INTEGER nwint
+      REAL wstart, wstop
+
+* Altitude grid
+
+      INTEGER nzm1, iz, izfix
+      REAL zstart, zstop, zout
+
+* Ozone, SO2 and NO2 absorption cross sections
+
+      INTEGER mabs
+      REAL o3xs(kz,kw), so2xs(kw), no2xs(kz,kw)
+
+* Layer temperatures, ozone column
+
+      REAL tlay(kz), co3(kz)
+
+* Weighting function index, temperature/pressure flags of reactions
+
+      INTEGER is
+      INTEGER tpflag(kj)
+
+**** Re-scaling factors (can be read from input file)
+* New surface albedo and surface pressure (milli bar)
+* Total columns of O3, SO2, NO2 (Dobson Units)
+* Cloud optical depth, altitude of base and top
+
+      REAL alsurf, psurf
+      REAL o3_tc, so2_tc, no2_tc
+      REAL taucld, zbase, ztop
+
+* Location, date and time from the input file (tuv4samasp uses SAM's);
+* air density and temperature at zout
+
+      REAL lat, lon
+      REAL zaird, ztemp
+      INTEGER iyear, imonth, iday
+      REAL tstart
+
+* input/output control
+
+      LOGICAL intrct
+      CHARACTER*6 inpfil
+
+* Planetary boundary layer pollutant concentrations
+
+      REAL o3pbl, so2pbl, no2pbl
+
+* WRF-Chem output control
+
+      LOGICAL wrfchm
+
+***** Surface waters (lakes, ocean)
+*   sdom = spectral absorption by Dissolved Organic Matter (DOM) 
+*          in lakes and ocean
+
+      INTEGER jdom, jd
+      CHARACTER*50 dlabel(kdom)
+      REAL sdom(kdom,kw)
+
+* spectrum locator indices:
+
+      integer js_dna, js_uvi, jd_dom
+
 * Open log file:
 
 c      OPEN(UNIT=kout,FILE='tuvlog',STATUS='UNKNOWN')
-      IF (.NOT. tuvinit) THEN
       OPEN(UNIT=kout,FILE='../'//'tuvlog'//'.txt',STATUS='UNKNOWN')
 
 * ___ SECTION 1: SIMPLE INPUT VARIABLES --------------------------------
@@ -733,7 +1042,7 @@ c      CALL newlst(ns,slabel,nj,jlabel)
 *   Optical depths in Lyman-alpha and SRB will be over-written
 *   in subroutine la_srb.f
 
-      CALL seto2(nz,z,nw,wl,aircol,o2xs1, dto2)
+      CALL seto2(nz,z,nw,wl,aircol,o2xs1, dto2s)
 
 * Ozone optical depths
 
@@ -759,42 +1068,6 @@ c      CALL newlst(ns,slabel,nj,jlabel)
      $     nz,z,nw,wl,
      $     dtcld,omcld,gcld)
 
-* Aerosol vertical profile, optical depths, single scattering albedo, asymmetry factor
-
-     
-      !do iz = 1, nz
-      !  write(*,*) "iz: ", iz
-      !  write(*,*) "iw = 1, AOD = ", dtaer(iz, 1)
-      !  write(*,*) "iw = 1, SSA = ", omaer(iz, 1)
-      !  write(*,*) "iw = 1, <g> = ", gaer(iz, 1)
-      !  write(*,*) "iw = 3, AOD = ", dtaer(iz, 3)
-      !  write(*,*) "iw = 3, SSA = ", omaer(iz, 3)
-      !  write(*,*) "iw = 3, <g> = ", gaer(iz, 3)
-      !enddo
-*     !END MJA 20190616 SAM-ASP overwrites of aerosol parameters
-
-      ! start MM DEBUG BLOCK
-      !write(*,*) "tuv4samasp:L746 After SAM-ASP overwrites"
-      !WRITE(*,*) "of aerosol parameters" 
-      !WRITE(*,*) "shape(dtaer) = ", shape(dtaer)
-      !WRITE(*,*) "shape(omaer) = ", shape(omaer)
-      !WRITE(*,*) "shape(gaer) = ", shape(gaer)
-      !IF ( ANY( dtaer <= 0) ) then
-      !   WRITE(*,*) "dtaer has a bad value <= 0"
-      !   WRITE(*,*) "dtaer = ", dtaer
-      !ENDIF
-                
-      !IF ( ANY( omaer < 0) .OR. ANY(omaer > 1.0)) then
-      !   WRITE(*,*) "omaer has a bad value < 0 OR > 1.0"
-      !   WRITE(*,*) "omaer = ", omaer
-      !ENDIF
-                
-      !IF ( ANY( gaer < -1.0) .OR. ANY(gaer > 1.0)) then
-      !   WRITE(*,*) "gaer has a bad value < -1.0 OR > 1.0"
-      !   WRITE(*,*) "gaer = ", gaer
-      !ENDIF
-      ! end MM DEBUG BLOCK
-
 * Snowpack physical and optical depths, single scattering albedo, asymmetry factor
 
       CALL setsnw(
@@ -806,344 +1079,7 @@ c      CALL newlst(ns,slabel,nj,jlabel)
       CALL setalb(alsurf,nw,wl,
      $     albedo)
 
-* keep the set-up O2 optical depths (la_srb may change dto2 per call)
-      DO iw = 1, kw
-         DO iz = 1, kz
-            dto2s(iz,iw) = dto2(iz,iw)
-         ENDDO
-      ENDDO
-      tuvinit = .TRUE.
-      ENDIF
-* ---- end of the one-time set-up; the rest is done on every call ----
-
-* time, site and date from SAM, and the solar position
-      tstart = samtstart
-      lat = REAL(samlat)
-      lon = REAL(samlon)
-      iyear = samyear
-      imonth = sammonth
-      iday = samday
-      CALL gridt(lat, lon, tmzone,
-     $     iyear, imonth, iday,
-     $     lzenit, tstart, tstop,
-     $     nt, t, sza, esfact)
-
-      DO iw = 1, kw
-         DO iz = 1, kz
-            dto2(iz,iw) = dto2s(iz,iw)
-         ENDDO
-      ENDDO
-
-* aerosols: TUV's default profile, with SAM-ASP's in SAM's layers
-      CALL setaer(ipbl, zpbl, aod330,
-     $     tauaer, ssaaer, alpha,
-     $     nz, z, nw, wl,
-     $     dtaer, omaer, gaer)
-
-*     !MJA 20190616 Overwrite the bottom of the aerosol profile with the SAM-ASP output  
-*     !Loop over SAM-ASP heights and wavelengths
-*     !NOTE: SAM-ASP alt and wv grid and TUV alt and wv grid must match exactly!    
-      do iz = 1, nsamz
-        do iw = 1, nw-1
-            !write(*,*) "iz: ", iz, "iw:", iw
-            dtaer(iz, iw) = samAOD(iz,iw) 
-            omaer(iz,iw) = samSSA(iz,iw)
-            gaer(iz,iw) = samASYM(iz,iw)
-        enddo
-      enddo
- 
-      ! MM DEBUG
-      ! loop over all layers   
-      do iz = 1, kz
-        do iw = 1, kw      
-        !Force non-zero values to protect against input errors
-           if (dtaer(iz, iw) .LE. 1.0e-20) dtaer(iz, iw) = 1.0e-20
-           if (omaer(iz, iw) .LE. 1.0e-20) omaer(iz, iw) = 0.99
-           if (ABS(gaer(iz,iw)) .LE. 1.0e-20) gaer(iz,iw) = 0.61
-        enddo
-      enddo
-
-      !Fix top layer, at every wavelength (this used to run after the
-      !iw loop had ended, i.e. with iw = kw+1, out of bounds)
-      !(the top layer is nz-1; it used to be fixed at 193)
-      do iw = 1, kw
-      !dtaer(nz-1, iw) = 0.0
-      dtaer(nz-1, iw) = 1.0E-20 ! MM DEBUG
-      omaer(nz-1,iw) = 1.0
-      gaer(nz-1,iw) = 0.0
-      enddo
-
-* Set any additional absorber or scatterer:
-* Must populate dt_any(kz,kw), om_any(kz,kw), g_any(kz,kw) manually
-* This allows user to put in arbitrary absorber or scatterer
-* could write a subroutine, e.g.:
-C      CALL setany(nz,z,nw,wl,aircol, dt_any,om_any, g_any)
-* or write manually here.
-
-      DO iz = 1, nz-1
-         DO iw = 1, nw-1
-c            dt_any(iz,iw) = 0.79*aircol(iz) * 2.e-17 ! N2 VUV absorption
-            dt_any(iz,iw) = 0.
-            om_any(iz,iw) = 0.
-            g_any(iz,iw) = 0.
-         ENDDO
-      ENDDO
-
-* ___ SECTION 6: TIME/SZA LOOP  _____________________________________
-
-* Initialize any time-integrated quantities here
-
-      adose = 0.
-      wdose0 = 0.
-      wdosei = 0.
-      CALL zero1(dose,ks)
-
-* Loop over time or solar zenith angle (zen):
-
-      DO 20, it = 1, nt
-
-         zen = sza(it)
-
-         WRITE(*,200) it, zen, esfact(it)
-      IF (lsamvb) THEN
-         WRITE(kout,200) it, zen, esfact(it)
-      ENDIF
- 200     FORMAT('step = ', I4,' sza = ', F9.3, 
-     $        ' Earth-sun factor = ', F10.7)
-
-* correction for earth-sun distance
-
-         DO iw = 1, nw - 1
-            etf(iw) = f(iw) * esfact(it)
-         ENDDO
-
-* ____ SECTION 7: CALCULATE ZENITH ANGLE-DEPENDENT QUANTITIES __________
-
-* slant path lengths for spherical geometry
-
-         CALL sphers(nz,z,zen, dsdh,nid)
-         CALL airmas(nz, dsdh,nid, aircol,vcol,scol)
-
-* Recalculate effective O2 optical depth and cross sections for Lyman-alpha
-* and Schumann-Runge bands, must know zenith angle
-* Then assign O2 cross section to sj(1,*,*)
-
-         CALL la_srb(nz,z,tlev,nw,wl,vcol,scol,o2xs1,
-     $        dto2,o2xs)
-         CALL sjo2(nz,nw,o2xs,1, sj)
-
-* ____ SECTION 8: WAVELENGTH LOOP ______________________________________
-
-
-* initialize for wavelength integration
-
-         CALL zero2(rate,ks,kz)
-         CALL zero2(valj,kj,kz)
-         wrate0 = 0.
-         wratei = 0.
-
-***** Main wavelength loop:
-      IF (lsamvb) THEN
-         write(*,*) "Before Wavelength Loop"
-      ENDIF
-         DO 10, iw = 1, nw-1
-
-** monochromatic radiative transfer. Outputs are:
-*  normalized irradiances     edir(iz), edn(iz), eup(iz) 
-*  normalized actinic fluxes  fdir(iz), fdn(zi), fup(iz)
-*  where 
-*  dir = direct beam, dn = down-welling diffuse, up = up-welling diffuse
-      IF (lsamvb) THEN
-            write(*,*) "Before rtlink"
-      ENDIF
-            CALL rtlink(nstr, nz,
-     $           iw, albedo(iw), zen,
-     $           dsdh,nid,
-     $           dtrl,
-     $           dto3,
-     $           dto2,
-     $           dtso2,
-     $           dtno2,
-     $           dtcld, omcld, gcld,
-     $           dtaer,omaer,gaer,
-     $           dtsnw,omsnw,gsnw,
-     $           dt_any,om_any,g_any,
-     $           edir, edn, eup, fdir, fdn, fup)
-      IF (lsamvb) THEN
-                 write(*,*) "After rtlink"
-      ENDIF
-* Spectral irradiance, W m-2 nm-1
-* for downwelling only, use difup = 0.
-
-            DO iz = 1, nz
-               sirrad(iz,iw) = etf(iw) * 
-     $           (dirsun*edir(iz) + difdn*edn(iz) + difup*eup(iz))
-            ENDDO
-
-* Spectral actinic flux, quanta s-1 nm-1 cm-2, all directions:
-*    units conversion:  1.e-4 * (wc*1e-9) / hc
-
-            DO iz = 1, nz
-               saflux(iz,iw) = etf(iw) * (1.e-13 * wc(iw) / hc) *
-     $              (dirsun*fdir(iz) + difdn*fdn(iz) + difup*fup(iz))
-            ENDDO
-
-*** Accumulate weighted integrals over wavelength, at all altitudes:
-
-            DO iz = 1, nz
-
-* Weighted irradiances (dose rates) W m-2
-
-               DO is = 1, ns
-                  drdw = sirrad(iz,iw) * sw(is,iw) 
-                  rate(is,iz) = rate(is,iz) + drdw * (wu(iw) - wl(iw))
-               ENDDO
-
-* Photolysis rate coefficients (J-values) s-1
-
-               DO ij = 1, nj
-                  djdw = saflux(iz,iw) * sj(ij,iz,iw)
-                  valj(ij,iz) = valj(ij,iz) + djdw * (wu(iw) - wl(iw))
-!		  write (*,*) "TUV4SAMASP L861 valj(:,1)",valj(:,1) !AD DEBUG
-               ENDDO
-
-            ENDDO
-
-************ In-water radiation:
-*   Input:  
-*     ydepth, in meters, for which radiation field is desired
-*     h2oabs = absorption coeff of DOM in H2O at this wavelength, 1/meter
-*     zen = solar zenith angle
-*   Output from subroutine waters:
-*     se_0 = solar beam irradiance just below surface
-*     de_0 = diffuse irradiance just below surface (sum over all angles)
-*     se_y = solar beam irradiance at ydepth
-*     de_y = diffuse irradiance at ydepth  (sum over all angles)
-*     se_i = integral of solar beam irradiance from surface to ydepth 
-*     de_i = integral of diffuse irradiance from surface to ydepth
-
-!            ydepth = 1.
-!            h2oabs = sdom(jd_dom,iw)
-!            CALL waters(zen,h2oabs,ydepth, 
-!     $           se_0,de_0,se_y,de_y,se_int,de_int)
-            
-* calculate spectral irradiances in water:
-* irradiance just below air-water interface:
-
-!            we_0 = etf(iw) * (se_0*edir(1)*dirsun + 
-!     $           de_0*edn(1)*difdn)
-
-* average spectral irradiance in water, from 0 to ydepth = integral / ydepth
-
-!            we_int = etf(iw) * (se_int*edir(1)*dirsun + 
-!     $           de_int*edn(1)*difdn) / ydepth
-
-* calculate DNA-weighted irradiance, just below surface and
-* averaged from 0 to ydepth
-
-!            drdw = we_0 * sw(js_dna,iw)
-!            wrate0 = wrate0 + drdw * (wu(iw)-wl(iw))
-
-!            drdw = we_int * sw(js_dna,iw)
-!            wratei = wratei + drdw * (wu(iw)-wl(iw))
-               
-
-**** Save irradiances and actinic fluxes for output
-
-!            CALL saver1(it, itfix, iw, iwfix,  nz, izout,
-!     $           sirrad, saflux,
-!     $           svi_zw, svf_zw, svi_zt, svf_zt, svi_tw, svf_tw)
- 10      CONTINUE
-
-*^^^^^^^^^^^^^^^^ end wavelength loop
-
-**** integrate doses over time: 
-* adose = dose in air just above surface
-* wdose0 = dose in water just below surface
-* wdosei = dose averaged over ydepth
-
-         adose = adose + 
-     $        rate(13,1) * 3600.* (tstop - tstart)/float(nt-1)
-         wdose0 = wdose0 + 
-     $        wrate0 * 3600.* (tstop - tstart)/float(nt-1)
-         wdosei = wdosei + 
-     $        wratei * 3600.* (tstop - tstart)/float(nt-1)
-
-* Save dose rates and j-values for output
-
-         CALL saver2(it,itfix, nz,izout, ns,isfix,ims, nj,ijfix,imj,
-     $        rate, valj,
-     $        svr_zs, svj_zj, svr_zt, svj_zt, svr_ts, svj_tj)
-
-    !Pass back the J-values of the selected reactions and their labels;
-    !the mapping to ASP's photolysis columns is done in SAM
-    !(samasp_photo.f90, PhotoMap.in)
-         samvalj(:,:) = 0.0
-         samnj = nmj
-         samnz = nz
-         samnw = nw - 1
-         samwc(:) = 0.0
-         do iw = 1, nw-1
-            samwc(iw) = wc(iw)
-         enddo
-         do ij = 1, nmj
-            samjlabel(ij) = jlabel(imj(ij))
-            do iz = 1, nz
-                samvalj(ij,iz) = valj(imj(ij),iz)
-            enddo
-         enddo
- 20   CONTINUE
-
-* output in-water doses
-
-!      write(*,222) adose, wdose0, wdosei, dlabel(jd_dom)
-! 222  format(3(0pf10.4,1x),a50)
-
-**output all Js at zout
-
-c      do iz = 1, nz
-c         if(z(iz) .eq. zout) then
-c            do ij = 1, nj
-c               write(44,444) valj(ij,iz), jlabel(ij)
-c            enddo
-c         endif
-c      enddo
-c 444  format(1pe11.4,1x,a50)
-*^^^^^^^^^^^^^^^^ end time/zenith loop
-
-* ____ SECTION 9: OUTPUT ______________________________________________
-
-* SAM-ASP: TUV's own output file is not needed (the J-values are returned
-* to SAM) and outpt1 rewrote ../<outfil>.txt, outside the run directory,
-* on every call. Set lsamout = .TRUE. to write it again.
-      IF (lsamout) call outpt1( outfil, iout, 
-     $     lirrad, laflux, lrates, ljvals, lmmech, lzenit,
-     $     nms, ims, nmj, imj,
-     $     nz, z, tlev, aircon, izout,
-     $     nw, wl, etf, iwfix,
-     $     nt, t, sza, itfix,
-     $     ns, slabel, isfix, nj, jlabel, ijfix,
-     $     svj_zj, svj_tj, svj_zt,
-     $     svr_zs, svr_ts, svr_zt,
-     $     svf_zw, svf_tw, svf_zt,
-     $     svi_zw, svi_tw, svi_zt )
-
- 30   continue
-
-*_______________________________________________________________________
-
-!      IF(intrct) THEN
-!         WRITE(*,*) 'do you want to do another calculation?'
-!         WRITE(*,*) 'y = yes'
-!         WRITE(*,*) 'any other key = no'
-!         READ(*,1001) again
-! 1001    FORMAT(A1)
-!         IF(again .EQ. 'y' .OR. again .EQ. 'Y') GO TO 1000
-!      ENDIF
-
-!      CLOSE(iout)
-      CLOSE(kout)
-      END SUBROUTINE tuv4samasp
+      END SUBROUTINE tuv_setup
 
 * Array sizes SAM needs for the tuv4samasp arguments (TUV's params)
       SUBROUTINE tuv4samasp_dims(nkz, nkw, nkj)
