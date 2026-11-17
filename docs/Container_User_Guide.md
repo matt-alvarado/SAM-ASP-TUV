@@ -130,7 +130,7 @@ checked out.
 | `--build-arg NSUBDOMAINS_X=8` | Number of MPI ranks (subdomains in x). It must divide 240, so 4, 6, 8, 10, 12, 16, 20, 24, … work; the default is 16. Choose it to match the physical cores of the machine you'll run on ([section 10](#10-performance-and-machine-size)). |
 | `--secret id=ca,src=/path/to/ca.crt` | An extra CA certificate, for building behind a corporate proxy that intercepts TLS. It's used only during the build and not kept in the image. |
 | `--build-arg HTTPS_PROXY=http://proxy:port` | Standard Docker proxy settings, if your network needs them. |
-| `--build-arg NTRACERS=4096` | SAM tracer count, for ASP decks other than the default set (the model prints the value your decks need). See [section 6](#6-asp-input-decks). |
+| `--build-arg NTRACERS=1486` | SAM tracer count, for ASP decks other than the default set (per case in `cases/README.md`; the model prints the value your decks need). See [section 6](#6-asp-input-decks). |
 | `-f Dockerfile.ubi9-gnu` | The RHEL 9 image built with the GNU compilers (gfortran) instead of Intel's: for **ARM64** machines such as Apple silicon Macs, or x86-64 machines without the Intel compilers. Results agree closely with the Intel builds but are not bit-identical. See the [Mac guide](Mac_AppleSilicon_CMMC_Guide.md). |
 | `-f Dockerfile.ubi9` | Build the **RHEL 9** image instead (Red Hat Universal Base Image 9), for sites that need the container's OS to be RHEL. Same model, entry point and settings; results are identical. See the [on-prem guide](OnPrem_RHEL_CMMC_Guide.md). |
 

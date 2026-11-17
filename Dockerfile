@@ -8,8 +8,9 @@
 #   docker build -t sam-asp-tuv .
 # Options:
 #   --build-arg NSUBDOMAINS_X=8   MPI ranks (subdomains in x; must divide 240)
-#   --build-arg NTRACERS=4096     SAM tracer count for decks other than the default
-#                                 (the model prints the value a deck set needs)
+#   --build-arg NTRACERS=1486     SAM tracer count for decks other than the default
+#                                 (per case in cases/README.md; the model prints
+#                                 the value a deck set needs)
 #   --secret id=ca,src=ca.crt     extra CA certificate, for building behind a
 #                                 TLS-intercepting proxy (used during the build only)
 

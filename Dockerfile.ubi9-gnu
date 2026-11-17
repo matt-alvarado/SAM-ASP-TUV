@@ -13,6 +13,8 @@
 #                                  hardened UBI 9 (default: Red Hat's UBI 9.8)
 #   --build-arg NSUBDOMAINS_X=8    MPI ranks (subdomains in x; must divide 240)
 #   --build-arg NTRACERS=1486      SAM tracer count for decks other than the default
+#                                  (per case in cases/README.md; the model prints
+#                                  the value a deck set needs)
 #   --secret id=ca,src=ca.pem      extra CA certificates, for building behind a
 #                                  TLS-intercepting proxy (used during the build only)
 #
