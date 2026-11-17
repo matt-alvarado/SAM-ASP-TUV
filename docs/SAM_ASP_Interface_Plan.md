@@ -610,3 +610,12 @@ Timings are asptest (30 steps, 16 MPI ranks oversubscribed on this machine).
   3D output fields POA4Gas and SOA1Gas-SOA4Gas were read from the wrong
   memory in every build since June 2024 (zeros or garbage). Model fields
   were not affected.
+- First real ERA5 download (Williams Flats, 2019-08-03 20 UTC; the cloud
+  workspace needs `object-store.os-api.cci2.ecmwf.int` allowed, where the CDS
+  serves results). Bug fixed: for the single-level request the CDS ignores
+  `download_format: unarchived` and returns a zip with one netCDF file per
+  step type (instantaneous and accumulated variables). `era5.download` now
+  merges such a zip into one netCDF file, and `read_column` also accepts a
+  zip (e.g. an `ERA5_SL_FILE` downloaded by hand). Test:
+  `test_cds_zip_single_levels`. The SAM `Build` script needs `csh`, which the
+  cloud set-up script must install.

@@ -19,6 +19,8 @@ on the dataset pages once. Downloaded files are cached and reused.
 """
 import datetime as dt
 import os
+import tempfile
+import zipfile
 
 import numpy as np
 
@@ -102,8 +104,52 @@ def download(lat, lon, time, cache_dir, client=None):
         for (dataset, req), f in todo:
             print('downloading %s -> %s' % (dataset, f))
             client.retrieve(dataset, req, f + '.part')
-            os.replace(f + '.part', f)
+            if zipfile.is_zipfile(f + '.part'):
+                # The CDS returns a zip of one file per step type (instant,
+                # accum) when a request mixes them, even with 'unarchived'
+                merge_zip(f + '.part', f + '.merged')
+                os.remove(f + '.part')
+                os.replace(f + '.merged', f)
+            else:
+                os.replace(f + '.part', f)
     return files
+
+
+def merge_zip(zip_path, out_path):
+    """Merge the netCDF files in a CDS zip into one netCDF file (variables
+    with the same name in several members are taken from the first)"""
+    import netCDF4
+    with tempfile.TemporaryDirectory() as tmp:
+        with zipfile.ZipFile(zip_path) as z:
+            members = sorted(n for n in z.namelist() if n.endswith('.nc'))
+            if not members:
+                raise SystemExit('%s: no netCDF files in the zip' % zip_path)
+            z.extractall(tmp, members)
+        with netCDF4.Dataset(out_path, 'w', format='NETCDF4') as out:
+            for m in members:
+                with netCDF4.Dataset(os.path.join(tmp, m)) as src:
+                    for name, d in src.dimensions.items():
+                        if name not in out.dimensions:
+                            out.createDimension(name, None if d.isunlimited() else len(d))
+                        elif len(out.dimensions[name]) != len(d):
+                            raise SystemExit('%s: dimension %s differs between members'
+                                             % (zip_path, name))
+                    for name, v in src.variables.items():
+                        if name in out.variables:
+                            continue
+                        fill = getattr(v, '_FillValue', None)
+                        o = out.createVariable(name, v.dtype, v.dimensions, fill_value=fill)
+                        o.setncatts({k: v.getncattr(k) for k in v.ncattrs() if k != '_FillValue'})
+                        o[...] = v[...]
+
+
+def _as_netcdf(path, tmp):
+    """path, or a merged copy in tmp if path is a CDS zip"""
+    if not zipfile.is_zipfile(path):
+        return path
+    out = os.path.join(tmp, os.path.basename(path) + '.merged.nc')
+    merge_zip(path, out)
+    return out
 
 
 # ---------------------------------------------------------------- reading
@@ -165,6 +211,11 @@ def _time_index(path, times, t):
 
 def read_column(pl_file, sl_file, lat, lon, time):
     """MetColumn at the grid point nearest (lat, lon) and the hour nearest time"""
+    with tempfile.TemporaryDirectory() as tmp:
+        return _read_column(_as_netcdf(pl_file, tmp), _as_netcdf(sl_file, tmp), lat, lon, time)
+
+
+def _read_column(pl_file, sl_file, lat, lon, time):
     import netCDF4
     t = nearest_hour(time)
     with netCDF4.Dataset(pl_file) as ds:

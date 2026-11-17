@@ -136,6 +136,47 @@ class Era5Read(unittest.TestCase):
         with self.assertRaises(SystemExit):                  # hour not in the file
             era5.read_column(pl, sl, 39.75, -122.5, T_VALID + dt.timedelta(hours=5))
 
+    def cds_zip(self, sl, path_zip):
+        """sl split as the CDS does it: a zip of one file per step type"""
+        import zipfile
+        groups = {'instant': ('sp', 'blh', 'iews', 'inss', 't2m'), 'accum': ('sshf', 'slhf')}
+        with zipfile.ZipFile(path_zip, 'w') as z:
+            for step, keep in groups.items():
+                part = os.path.join(self.d, 'data_stream-oper_stepType-%s.nc' % step)
+                with netCDF4.Dataset(sl) as src, netCDF4.Dataset(part, 'w') as out:
+                    for name, d in src.dimensions.items():
+                        out.createDimension(name, len(d))
+                    for name, v in src.variables.items():
+                        if name in keep or name in src.dimensions:
+                            o = out.createVariable(name, v.dtype, v.dimensions)
+                            o.setncatts({k: v.getncattr(k) for k in v.ncattrs()})
+                            o[...] = v[...]
+                z.write(part, os.path.basename(part))
+
+    def test_cds_zip_single_levels(self):
+        pl, sl = os.path.join(self.d, 'pl.nc'), os.path.join(self.d, 'sl.nc')
+        write_era5(pl, sl)
+        zp = os.path.join(self.d, 'sl.zip')
+        self.cds_zip(sl, zp)
+        t = dt.datetime(2009, 11, 17, 20, 12)
+        ref = era5.read_column(pl, sl, 39.70, -122.58, t)
+        # read directly from the zip (e.g. a user's ERA5_SL_FILE)
+        m = era5.read_column(pl, zp, 39.70, -122.58, t)
+        for k in ('psfc', 'hpbl', 'shf', 'lhf', 'taux', 'tauy', 't2m'):
+            self.assertEqual(getattr(m, k), getattr(ref, k), k)
+
+        # download(): the zip the CDS returns is stored as one netCDF file
+        class Client:
+            def retrieve(_, dataset, req, target):
+                shutil.copy(pl if 'pressure' in dataset else zp, target)
+        cache = os.path.join(self.d, 'cache')
+        fpl, fsl = era5.download(39.70, -122.58, t, cache, client=Client())
+        self.assertFalse(__import__('zipfile').is_zipfile(fsl))
+        self.assertEqual(sorted(os.listdir(cache)), sorted(map(os.path.basename, (fpl, fsl))))
+        m = era5.read_column(fpl, fsl, 39.70, -122.58, t)
+        for k in ('psfc', 'hpbl', 'shf', 'lhf', 'taux', 'tauy', 't2m'):
+            self.assertEqual(getattr(m, k), getattr(ref, k), k)
+
     def test_hour_rounding(self):
         self.assertEqual(era5.nearest_hour(dt.datetime(2009, 1, 1, 5, 29)), dt.datetime(2009, 1, 1, 5))
         self.assertEqual(era5.nearest_hour(dt.datetime(2009, 1, 1, 23, 30)), dt.datetime(2009, 1, 2, 0))
