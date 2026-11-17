@@ -556,187 +556,166 @@ deallocate(SaltConcBin)
  !---------------------------------
  subroutine tracers_physics()
 
- ! add here a call to a subroutine that does something to tracers besides advection and diffusion.
- ! The transport is done automatically. 
+ ! Sources and sinks of the tracers besides advection and diffusion (which
+ ! are done automatically): fire emissions, ASP chemistry and aerosol
+ ! microphysics in the plume cells, and TUV photolysis rates for the next step.
+ ! Called every (sub)step.
   use vars
-  use GridPointFields
-  use OutputRoutines
-  use grid, only: day
   use params
-  use Chemistry
       implicit none
 
-      integer i,j,k,l,ntr,ntrtrack,mm,iup,idown,iden,zden,aerosol_track,binnum,ASP_time,ntrtrack2,irxn,nwvn,kk
-      integer :: doAerosols
-      integer :: it_fire, jt_fire ! global offset of this rank's subdomain
-      integer :: tuv_month, tuv_dom ! calendar month and day of month for TUV
-
-      REAL*8 :: prestm,rhtm, temptm, airdens, boxmass,  Transmissivity,np,svp,airdenstm,tstep,solar_zenith_angle,cur_dist      
-      REAL*8 :: dels1,H
-      REAL*8 :: airmols,boxmols
-      REAL*8 :: wvmixsat,wvmixamb,waterconc,rhtm1
-      REAL*8 :: track_totoa
+      REAL*8 :: tstep, solar_zenith_angle
+      REAL*8 :: fire_nstep_end ! last step of fire emissions; ASP runs after it
+      REAL*8 :: H ! local hour angle (deg)
       REAL*8 :: dels ! solar declination angle (seasonal effect) (radians)
       REAL*8 :: hour ! hour of day (UTC time)
       REAL*8 :: iday ! floor of day of year (i.e. no fractional part of day)
-      REAL*8 :: sinlea ! sin of local elevation angle
-
-      !! ------------- from ASP ----------------- External Variables!
-      REAL*8 :: GasConc(HowManyEvolveGasChems)  
-      REAL*8 :: AfterGasConc(HowManyEvolveGasChems)  
-      REAL*8 :: TempGasConc(HowManyEvolveGasChems)   
-      REAL*8 :: NumConc(nBins)   
-      REAL*8 :: MassConc(nBins,nSpec)   
-      REAL*8 :: AfterNum(nBins)   
-      REAL*8 :: AfterMass(nBins,nSpec)
-
-      REAL*8 :: TermVel(nBins) 
-      REAL*8 :: t_TotOA   
-      REAL*8 :: PhotolysisRates(nPhoto)   
       ! plume cells of this rank, their ASP inputs and outputs
-      integer :: ncell, icell
+      integer :: ncell
       integer, allocatable :: cell_ijl(:,:)
-      ! distinct TUV column inputs of this step and their photolysis rates
-      integer :: ntuv_cache, icache, ihit
-      integer(8), allocatable, save :: tuv_cache_key(:,:)
-      real*8, allocatable, save :: tuv_cache_j(:,:,:)
-      integer(8), allocatable, save :: tuv_key_now(:)
       real*8, allocatable :: aspin(:,:), aspout(:,:), cell_aird(:)
-      ! ---------------------- end from ASP
-
 
       Mgas = GetM()
-      !	Enter Fire Emissions, when over fire - else use tracers background concentrations
-      zlower = 1!int(round(float(vals[6])*1000./float(dz))) ! this is number of the lower box
-      zhigher = zlower+1 ! this is the upper INCLUSIVE box
+      zlower = 1 ! lower emission level (the fire box is fire_k1..fire_k2)
+      zhigher = zlower+1 ! upper emission level, inclusive
       emisgridy = 1
-      idown=(101-xextent)/2
-      iup=(100+xextent)/2
-      AfterGasConc = 0.0D0
-      Transmissivity = 1.0
       tstep = dble(dtn) ! ASP time step = SAM's (sub)step; tracers_physics is called every substep
-
 
       ! calculate solar zenith angle
       iday = int(day)
       hour = (day - iday)*24.
-      tv = iday-vernal_equinox ! days since vernal equinox  
+      tv = iday-vernal_equinox ! days since vernal equinox
       lambda = 360*(tv/365.24)! longitude of Earth from vernal equinox
       dels = asin(sin(earth_tilt/180*pi)*sin(lambda/180*pi))
       H = 360*((hour-12)/24.) + longitude0 ! local hour angle (deg), longitude east positive
-      solar_zenith_angle = acos(sin(latitude0/180*pi)*sin(dels)+cos(latitude0/180*pi)*cos(dels)*cos(H/180*pi))*180/pi	
+      solar_zenith_angle = acos(sin(latitude0/180*pi)*sin(dels)+cos(latitude0/180*pi)*cos(dels)*cos(H/180*pi))*180/pi
 
+      ! Emissions last 2*(plume_y-dy)/vg/dt steps from fire_nstep_start
+      fire_nstep_end = (((plume_y-dy)/vg/dt)*2)+fire_nstep_start
 
-      cur_dist = (((plume_y-dy)/vg/dt)*2)+fire_nstep_start
+      call add_fire_emissions(fire_nstep_end)
 
+      ! ASP is run in three passes so that, with MPI, the plume cells of all
+      ! ranks can be shared out evenly (samasp_balance): (1) collect the ASP
+      ! inputs of this rank's plume cells, (2) run ASP on them, (3) store the
+      ! results; then TUV is run for each column.
+      call collect_plume_cells(fire_nstep_end, solar_zenith_angle, tstep, &
+                               ncell, aspin, cell_ijl, cell_aird)
+      allocate(aspout(asp_nout(), max(ncell,1)))
+      call balanced_compute(dompi, asp_nin(), asp_nout(), ncell, aspin, aspout, asp_cells)
+      call store_asp_results(ncell, aspout, cell_ijl, cell_aird)
+      deallocate(aspin, aspout, cell_ijl, cell_aird)
 
-      ! Adding Fire Emissions if over fire
-      ! fire_i1..fire_i2 are global x indices; each rank adds emissions to
-      ! the part of that range it owns (local i = global i - it_fire).
-      call task_rank_to_index(rank,it_fire,jt_fire)
-      if (fire_i2-it_fire.ge.1 .and. fire_i1-it_fire.le.nx) then
-         if (nstep.gt.fire_nstep_start.and.nstep.le.cur_dist) then
-	    do iden = max(1,fire_i1-it_fire), min(nx,fire_i2-it_fire)
-		do zden = fire_k1, fire_k2
-		     prestm = dble(pres(zden)*100.d0) +p(iden,emisgridy,zden)! in Pa  
-	             temptm = dble(tabs(iden,emisgridy,zden)) ! in K
+      call compute_column_photolysis(hour)
 
-	             airdens = prestm*airmw/(gasc*temptm) ! in kg/m3
-                     airdenstm = prestm*Av/(gasc*temptm)/1e6 ! in molec/cm3
+      if (samasp_verbose) write(*,*) "end tracers_physics loop"
 
-		     ntrtrack = 1
-		     do ntr=1, HowManyEvolveGasChems
-               		tracer(iden,emisgridy,zden,ntrtrack) = tracer(iden,emisgridy,zden,ntrtrack)+tracerfire(iden,emisgridy,zden,ntrtrack)! kg/kg_air! 
+      trphys = 0. ! Default tendency due to physics. You code should compute this to output statistics.
+ end subroutine tracers_physics
 
+ ! Fire emissions: from step fire_nstep_start+1 to fire_nstep_end, add each
+ ! cell's per-step emission (tracerfire, set in tracers_init) to the tracers
+ ! of the fire box: GLOBAL x indices fire_i1..fire_i2, levels
+ ! fire_k1..fire_k2, y row emisgridy. Each rank adds emissions to the part of
+ ! that x range it owns (local i = global i - it_fire).
+ subroutine add_fire_emissions(fire_nstep_end)
+   use params
+   real*8, intent(in) :: fire_nstep_end
+   integer :: i, j, l, ntr, binnum, n
+   integer :: it_fire, jt_fire ! global offset of this rank's subdomain
 
-			ntrtrack = ntrtrack+1
-   
-		     enddo 
+   call task_rank_to_index(rank,it_fire,jt_fire)
+   if (.not. (fire_i2-it_fire.ge.1 .and. fire_i1-it_fire.le.nx)) return
+   if (.not. (nstep.gt.fire_nstep_start.and.nstep.le.fire_nstep_end)) return
+   j = int(emisgridy)
+   do i = max(1,fire_i1-it_fire), min(nx,fire_i2-it_fire)
+      do l = fire_k1, fire_k2
+         ! gas species (kg/kg_air)
+         do ntr = 1, nGas
+            n = itr_gas(ntr)
+            tracer(i,j,l,n) = tracer(i,j,l,n) + tracerfire(i,j,l,n)
+         enddo
+         do binnum = 1, nBins
+            ! aerosol species masses (kg/kg_air)
+            do ntr = 1, nSpec
+               n = itr_mass(binnum,ntr)
+               tracer(i,j,l,n) = tracer(i,j,l,n) + tracerfire(i,j,l,n)
+            enddo
+            ! particle number (#/kg_air)
+            n = itr_num(binnum)
+            tracer(i,j,l,n) = tracer(i,j,l,n) + tracerfire(i,j,l,n)
+         enddo
+      enddo
+   enddo
+ end subroutine add_fire_emissions
 
-                     do binnum=1,nBins
-                        ! Aerosol MassConc
-                        ! Aqueous Phase Chems + Organic Phase Chems + Aq Organic Phase Chems
-                      do ntr = 1, nSpec!
+ ! Collect the plume cells of this rank (CO above asp_co_threshold_ppb, after
+ ! the emission period) and pack their ASP inputs: gas mixing ratios (ppb),
+ ! aerosol masses (ug/m3) and numbers (#/cm3), T, p, air density and the
+ ! photolysis rates TUV computed for the cell on the previous step.
+ ! On return, aspin(:,c), cell_ijl(:,c) (i, j, l) and cell_aird(c) (air
+ ! number density, molec/cm3) hold cell c = 1..ncell.
+ subroutine collect_plume_cells(fire_nstep_end, solar_zenith_angle, tstep, &
+                                ncell, aspin, cell_ijl, cell_aird)
+   use vars
+   use params
+   real*8, intent(in) :: fire_nstep_end, solar_zenith_angle, tstep
+   integer, intent(out) :: ncell
+   integer, allocatable, intent(out) :: cell_ijl(:,:)
+   real*8, allocatable, intent(out) :: aspin(:,:), cell_aird(:)
+   integer :: i, j, l, ntr, binnum
+   REAL*8 :: prestm, temptm, airdens, airdenstm, Transmissivity, svp
+   REAL*8 :: wvmixsat, wvmixamb, rhtm, waterconc, t_TotOA
+   REAL*8 :: GasConc(HowManyEvolveGasChems)
+   REAL*8 :: NumConc(nBins)
+   REAL*8 :: MassConc(nBins,nSpec)
+   REAL*8 :: PhotolysisRates(nPhoto)
 
-	   		   tracer(iden,emisgridy,zden,ntrtrack) = tracer(iden,emisgridy,zden,ntrtrack) + tracerfire(iden,emisgridy,zden,ntrtrack)! in kg/kg_air
-		       ntrtrack = ntrtrack+1
-                      enddo
-
-                       ! NumConc
-                      tracer(iden,emisgridy,zden,itr_num(binnum)) = tracer(iden,emisgridy,zden,itr_num(binnum))+ tracerfire(iden,emisgridy,zden,itr_num(binnum))! in #/kg_air
-                     enddo ! binnum
-
-!---------------------------     
-	   	enddo ! zden
-	    enddo ! iden
-         endif ! rank eq 5
-      endif ! nstep eq.
-
-   ! ASP is run in three passes so that, with MPI, the plume cells of all
-   ! ranks can be shared out evenly (samasp_balance): (1) collect the ASP
-   ! inputs of this rank's plume cells, (2) run ASP on them, (3) store the
-   ! results; then TUV is run for each column.
+   Transmissivity = 1.0
    ncell = 0
    allocate(aspin(asp_nin(), 64), cell_ijl(3, 64), cell_aird(64))
    do i=1,nx
       do j=1,ny
          do l=1,nzm
 
-            prestm = dble(pres(l)*100.d0) + p(i,j,l) ! in Pa     
+            prestm = dble(pres(l)*100.d0) + p(i,j,l) ! in Pa
 
             temptm = dble(tabs(I,J,L)) ! in K
+            ! box volume (module variable boxvol); ASP does not need it
             if (l.eq.1)then
                boxvol = dble(dx*dy*dz*1.0d6) ! in cm3
             else
                boxvol = dble(dx*dy*(zi(l)-zi(l-1))*1.0d6) ! in cm3
             endif
             airdens = prestm*airmw/(gasc*temptm) ! in kg/m3
-	    airdenstm = prestm*Av/(gasc*temptm)/1.0d6! in molec/cm3
-
-            boxmass = dble(boxvol/1.0d6*airdens) ! in kg!
+            airdenstm = prestm*Av/(gasc*temptm)/1.0d6! in molec/cm3
 
             wvmixsat = dble(qsatw(real(temptm),real(prestm)/100.)) ! kg water/kg air
             wvmixamb = dble(qv(i,j,l)) ! kg water/kg air
             rhtm = wvmixamb/wvmixsat ! relative humidity 0-1
             svp = (6.112*exp(6816*((1/273.15)-(1/temptm))+(5.1309*log(273.15/temptm))))*100.d0 ! in Pa
-	    waterconc = (svp*airdenstm)*rhtm/(prestm) ! 
-	    airmols = (pres(l)+p(i,j,l))*100.d0/(gasc*tabs(i,j,l)) ! in mol/m3 ideal gas law
-	    boxmols = (boxvol/1e6)*airmols ! in mols
+            waterconc = (svp*airdenstm)*rhtm/(prestm) !
 
-	    ntrtrack = 1
-	    ! Gas Phase Chems
-
+            ! Gas species, kg/kg_air to ppb; NaN and negative values set to 0
             do ntr=1,HowManyEvolveGasChems
-		GasConc(ntr)  = tracer(i,j,l,ntr)*airmw/GasMolecularMass(ntr)*1e9! kg/kg_air to ppb
-
-            	if (IsNaN(GasConc(ntr)))then
-	    		GasConc(ntr) = 0.0
-           	endif
-
-            	if (GasConc(ntr).lt.0)then
-	    		GasConc(ntr) = 0.0
-           	endif
-
-		ntrtrack = ntrtrack +1
-                ntrtrack2 = ntrtrack +1
+               GasConc(ntr)  = tracer(i,j,l,itr_gas(ntr))*airmw/GasMolecularMass(ntr)*1e9
+               if (IsNaN(GasConc(ntr)))then
+                  GasConc(ntr) = 0.0
+               endif
+               if (GasConc(ntr).lt.0)then
+                  GasConc(ntr) = 0.0
+               endif
             enddo
-
             GasConc(iH2Og) = waterconc
 
-
-	
-            IF (GasConc(iCOg).gt.asp_co_threshold_ppb.and.nstep.gt.cur_dist) THEN
-            	! Aerosol MassConc
-            	! Aqueous Phase Chems + Org Phase + Aq Org Phase
-
+            IF (GasConc(iCOg).gt.asp_co_threshold_ppb.and.nstep.gt.fire_nstep_end) THEN
+               ! Aerosol species masses (kg/kg_air to ug/m3) and numbers
+               ! (#/kg_air to #/cm3); a bin with no mass has no particles
                do binnum=1,nBins
                   do ntr = 1, nSpec
-
-			MassConc(binnum,ntr)=tracer(i,j,l,ntrtrack)*(airdenstm/Av*airmw)*1e12
-			ntrtrack = ntrtrack+1
+                     MassConc(binnum,ntr)=tracer(i,j,l,itr_mass(binnum,ntr))*(airdenstm/Av*airmw)*1e12
                   enddo
-            	  NumConc(binnum) = tracer(i,j,l,itr_num(binnum))*(airdenstm/Av*airmw*1e-3)
-
+                  NumConc(binnum) = tracer(i,j,l,itr_num(binnum))*(airdenstm/Av*airmw*1e-3)
                enddo
                do binnum=1,nBins
                   if (sum(MassConc(binnum,:)).lt.1e-30) then
@@ -744,122 +723,109 @@ deallocate(SaltConcBin)
                   end if
                enddo
 
-               ! writing print statements
-               t_TotOA = 0.0
                ! Diagnostic of one plume cell
                if (samasp_verbose .and. i.eq.12.and.l.eq.30) then
+                  t_TotOA = 0.0
                   write(*,*) 'Gas+Aerosol going into ASP...' ,nstep
                   write(*,*) sum(MassConc(:,1)),MassConc(:,1)
                   do ntr = nAq+1, nAq+nOrg ! all organic-phase species
-
-			ntrtrack2 = ntrtrack2+1
-                        t_TotOA = t_TotOA + sum(MassConc(:,ntr))
+                     t_TotOA = t_TotOA + sum(MassConc(:,ntr))
                   enddo
-                  
                   write(*,*) 'NoCo ',sum(NumConc(:)),NumConc(:)
                   write(*,*) 'TotOA = ',t_TotOA
                endif
 
-		do ntr=1,HowManyEvolveGasChems
-            	    if (IsNaN(GasConc(ntr)))then
-			write(*,*) 'ATTENTION!!!!', GasPhaseChemicalNames(ntr),tracer(i,j,l,ntr)
-		    endif
-	        enddo
-                if (samasp_verbose) write(*,*) "Before input PhotolysisRates"
-                PhotolysisRates(:) = PhotoArr(i,j,l,:)
-                ! Rates for species not in TUV (e.g. columns 49-51) are set
-                ! with their scale factors in PhotoMap.in (samasp_photo_map)
+               if (samasp_verbose) write(*,*) "Before input PhotolysisRates"
+               PhotolysisRates(:) = PhotoArr(i,j,l,:)
+               ! Rates for species not in TUV (e.g. columns 49-51) are set
+               ! with their scale factors in PhotoMap.in (samasp_photo_map)
 
-                if (ncell == size(cell_aird)) call grow_cell_buffers(aspin, cell_ijl, cell_aird)
-                ncell = ncell + 1
-                cell_ijl(:,ncell) = (/ i, j, l /)
-                cell_aird(ncell) = airdenstm
-                call asp_pack_in(aspin(:,ncell), solar_zenith_angle, GasConc, temptm, prestm, &
-                                 airdens, tstep, MassConc, NumConc, Transmissivity, i, l, &
-                                 PhotolysisRates)
-            END IF ! GT GasConc(2)
+               if (ncell == size(cell_aird)) call grow_cell_buffers(aspin, cell_ijl, cell_aird)
+               ncell = ncell + 1
+               cell_ijl(:,ncell) = (/ i, j, l /)
+               cell_aird(ncell) = airdenstm
+               call asp_pack_in(aspin(:,ncell), solar_zenith_angle, GasConc, temptm, prestm, &
+                                airdens, tstep, MassConc, NumConc, Transmissivity, i, l, &
+                                PhotolysisRates)
+            END IF ! plume cell
          enddo
       enddo
    enddo
+ end subroutine collect_plume_cells
 
-   allocate(aspout(asp_nout(), max(ncell,1)))
-   call balanced_compute(dompi, asp_nin(), asp_nout(), ncell, aspin, aspout, asp_cells)
+ ! Store ASP's results for the plume cells back in the tracers (gas ppb to
+ ! kg/kg_air, NaN and negative values set to 0; aerosol masses and numbers
+ ! to kg/kg_air and #/kg_air) and keep each cell's aerosol optics for TUV.
+ ! Optics outside their physical range are reported.
+ subroutine store_asp_results(ncell, aspout, cell_ijl, cell_aird)
+   use params
+   integer, intent(in) :: ncell, cell_ijl(:,:)
+   real*8, intent(in) :: aspout(:,:), cell_aird(:)
+   integer :: icell, i, j, l, ntr, binnum, nwvn
+   REAL*8 :: airdenstm, t_TotOA
+   REAL*8 :: AfterGasConc(HowManyEvolveGasChems)
+   REAL*8 :: NumConc(nBins)
+   REAL*8 :: MassConc(nBins,nSpec)
 
    do icell = 1, ncell
       i = cell_ijl(1,icell); j = cell_ijl(2,icell); l = cell_ijl(3,icell)
       airdenstm = cell_aird(icell)
       call asp_unpack_out(aspout(:,icell), AfterGasConc, MassConc, NumConc, &
                           ExtCoeff, SingScat, Assym)
-                if (samasp_verbose) write(*,*) "tracers_physics: After SAM_wrapper"
-                IF ( ANY( ExtCoeff <= 0) ) then
-                   WRITE(*,*) "ExtCoeff has a bad value <= 0"
-                   WRITE(*,*) "ExtCoeff = ", ExtCoeff
-                END IF
-                
-                IF ( ANY( SingScat < 0) .OR. ANY(SingScat > 1.0)) then
-                   WRITE(*,*) "SingScat has a bad value < 0 OR > 1.0"
-                   WRITE(*,*) "SingScat = ", SingScat
-                END IF
-                
-                IF ( ANY( Assym < -1.0) .OR. ANY(Assym > 1.0)) then
-                   WRITE(*,*) "Assym has a bad value < -1.0 OR > 1.0"
-                   WRITE(*,*) "Assym = ", Assym
-                END IF
-                  
-                do nwvn = 1,NFastTUVWvl
-                   ExtCoeffArr(i,j,l,nwvn) = ExtCoeff(nwvn) !mja 20210721
-                   SingScatArr(i,j,l,nwvn) = SingScat(nwvn) !mja 20210721
-                   AssymArr(i,j,l,nwvn) = Assym(nwvn) !mja 20210721
-                enddo
-                
+      if (samasp_verbose) write(*,*) "tracers_physics: After SAM_wrapper"
+      IF ( ANY( ExtCoeff <= 0) ) then
+         WRITE(*,*) "ExtCoeff has a bad value <= 0"
+         WRITE(*,*) "ExtCoeff = ", ExtCoeff
+      END IF
+      IF ( ANY( SingScat < 0) .OR. ANY(SingScat > 1.0)) then
+         WRITE(*,*) "SingScat has a bad value < 0 OR > 1.0"
+         WRITE(*,*) "SingScat = ", SingScat
+      END IF
+      IF ( ANY( Assym < -1.0) .OR. ANY(Assym > 1.0)) then
+         WRITE(*,*) "Assym has a bad value < -1.0 OR > 1.0"
+         WRITE(*,*) "Assym = ", Assym
+      END IF
 
-		ntrtrack =1
-		! Gas Phase Species
-            	do ntr=1,HowManyEvolveGasChems
-            	   if (AfterGasConc(ntr).lt.0)then
-   	    		AfterGasConc(ntr) = 0.0
-           	   endif
-            	   if (IsNaN(AfterGasConc(ntr)))then
-   	    		AfterGasConc(ntr) = 0.0
-           	   endif
+      do nwvn = 1,NFastTUVWvl
+         ExtCoeffArr(i,j,l,nwvn) = ExtCoeff(nwvn)
+         SingScatArr(i,j,l,nwvn) = SingScat(nwvn)
+         AssymArr(i,j,l,nwvn) = Assym(nwvn)
+      enddo
 
-		    
-		   tracer(i,j,l,ntr)=AfterGasConc(ntr)*GasMolecularMass(ntr)/airmw/1e9! ppb to kg/kg_air
-                    
-		   ntrtrack  = ntrtrack+1
-                   ntrtrack2 = ntrtrack+1
-            	enddo
+      ! Gas species, ppb to kg/kg_air
+      do ntr=1,HowManyEvolveGasChems
+         if (AfterGasConc(ntr).lt.0)then
+            AfterGasConc(ntr) = 0.0
+         endif
+         if (IsNaN(AfterGasConc(ntr)))then
+            AfterGasConc(ntr) = 0.0
+         endif
+         tracer(i,j,l,itr_gas(ntr))=AfterGasConc(ntr)*GasMolecularMass(ntr)/airmw/1e9
+      enddo
 
-            	! Aqueous Phase Chems + Org Phase + Aq Org Phase
-            	do binnum=1,nBins
-                   do ntr = 1, nSpec
-			tracer(i,j,l,ntrtrack)= MassConc(binnum,ntr)/(airdenstm/Av*airmw)/1e12
-			ntrtrack = ntrtrack+1
-            	   enddo
+      ! Aerosol species masses (ug/m3 to kg/kg_air) and numbers (#/cm3 to #/kg_air)
+      do binnum=1,nBins
+         do ntr = 1, nSpec
+            tracer(i,j,l,itr_mass(binnum,ntr))= MassConc(binnum,ntr)/(airdenstm/Av*airmw)/1e12
+         enddo
+         tracer(i,j,l,itr_num(binnum))= NumConc(binnum)/(airdenstm/Av*airmw*1e-3)
+      enddo
 
-            	   ! NumConc
-		   tracer(i,j,l,itr_num(binnum))= NumConc(binnum)/(airdenstm/Av*airmw*1e-3)
-
-                enddo ! binnum
-               ! writing print statements
-               t_TotOA = 0.0
-               if (samasp_verbose .and. i.eq.12.and.l.eq.30) then
-                  write(*,*) 'Gas+Aerosol after ASP...' ,nstep
-                  write(*,*) sum(MassConc(:,1)),MassConc(:,1)
-                  do ntr = nAq+1, nAq+nOrg ! all organic-phase species
-                       t_TotOA = t_TotOA + sum(MassConc(:,ntr))
-                       ntrtrack2 = ntrtrack2+1
-                  enddo
-
-                  write(*,*) 'NoCo ',sum(NumConc(:)),NumConc(:)
-                  write(*,*) 'TotOA = ',t_TotOA
-               endif
+      ! Diagnostic of one plume cell
+      if (samasp_verbose .and. i.eq.12.and.l.eq.30) then
+         t_TotOA = 0.0
+         write(*,*) 'Gas+Aerosol after ASP...' ,nstep
+         write(*,*) sum(MassConc(:,1)),MassConc(:,1)
+         do ntr = nAq+1, nAq+nOrg ! all organic-phase species
+            t_TotOA = t_TotOA + sum(MassConc(:,ntr))
+         enddo
+         write(*,*) 'NoCo ',sum(NumConc(:)),NumConc(:)
+         write(*,*) 'TotOA = ',t_TotOA
+      endif
    enddo ! icell
-   deallocate(aspin, aspout, cell_ijl, cell_aird)
 
-   ! Whole optics arrays checked once per step (they were checked after every
-   ! plume cell, i.e. (cells x array size) work; each cell's own values are
-   ! checked above as it is stored)
+   ! The whole optics arrays are checked once per step; each cell's own
+   ! values are checked above as they are stored
    IF ( ANY( ExtCoeffArr <= 0) ) then
       WRITE(*,*) "ExtCoeffArr has a bad value <= 0"
       WRITE(*,*) "ExtCoeffArr = ", ExtCoeffArr
@@ -872,16 +838,32 @@ deallocate(SaltConcBin)
       WRITE(*,*) "AssymArr has a bad value < -1.0 OR > 1.0"
       WRITE(*,*) "AssymArr = ", AssymArr
    END IF
+ end subroutine store_asp_results
 
-   ! TUV: every column has the same site, time and grid, so a column's J-values
-   ! depend only on its aerosol optics. A column whose optics are bit-identical
-   ! to those of a column already computed this step (e.g. all columns outside
-   ! the plume) reuses that column's photolysis rates.
+ ! Photolysis rates of every column for the next step: TUV with the column's
+ ! aerosol optics, J-values interpolated to SAM's layer mid-heights and
+ ! mapped to ASP's photolysis columns (PhotoArr).
+ ! Every column has the same site, time and grid, so a column's J-values
+ ! depend only on its aerosol optics. A column whose optics are bit-identical
+ ! to those of a column already computed this step (e.g. all columns outside
+ ! the plume) reuses that column's photolysis rates.
+ subroutine compute_column_photolysis(hour)
+   use vars
+   use params
+   real*8, intent(in) :: hour ! UTC
+   integer :: i, j, kk, nwvn
+   integer :: tuv_month, tuv_dom ! calendar month and day of month for TUV
+   ! distinct TUV column inputs of this step and their photolysis rates
+   integer :: ntuv_cache, icache, ihit
+   integer(8), allocatable, save :: tuv_cache_key(:,:)
+   real*8, allocatable, save :: tuv_cache_j(:,:,:)
+   integer(8), allocatable, save :: tuv_key_now(:)
+
    ntuv_cache = 0
 
    do i=1,nx
       do j=1,ny
-         samtstart = hour ! UTC
+         samtstart = hour
          DO kk = 1,nzm
            DO nwvn = 1,NFastTUVWvl
              ! layer optical depth = extinction (1/Mm) x layer thickness (m) / 1e6
@@ -891,7 +873,6 @@ deallocate(SaltConcBin)
            ENDDO !nwvn
          ENDDO !kk
 
-         
          call tuv_key(samAOD, samSSA, samASYM, nzm, NFastTUVWvl, tuv_key_now)
          ihit = 0
          do icache = 1, ntuv_cache
@@ -938,13 +919,9 @@ deallocate(SaltConcBin)
          tuv_cache_j(:,:,ntuv_cache) = jasp(1:nzm,:)
          if (samasp_verbose) write(*,*) "After store PhotolysisRates"
       enddo
-   enddo ! end grid loop
+   enddo
+ end subroutine compute_column_photolysis
 
-if (samasp_verbose) write(*,*) "end tracers_physics loop"
-
-!----------------------
- trphys = 0. ! Default tendency due to physics. You code should compute this to output statistics.
- end subroutine tracers_physics
 !----------------------------------
 
  subroutine tracers_hbuf_init(namelist,deflist,unitlist,status,average_type,count,trcount)
