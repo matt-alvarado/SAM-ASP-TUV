@@ -20,6 +20,8 @@ TUV_LIB = $(TUV_BUILD_DIR)/libTuvLibrary.a
 vpath %.f $(TUV_DIR)
 vpath params $(TUV_DIR)
 vpath tuvstate $(TUV_DIR)
+vpath samvrb $(TUV_DIR)
+vpath samaer $(TUV_DIR)
 AR = ar
 AR_FLAGS = -rv
 
@@ -79,6 +81,8 @@ $(USE_INCL):	$(INCLUDES)
 
 # TUV set-up kept between tuv4samasp calls (common blocks)
 TUV4SAMASP.o:	tuvstate
+TUV4SAMASP.o rtrans.o:	samvrb
+TUV4SAMASP.o:	samaer
 
 .f.o:		
 		$(FC) $(FFLAGS) $(TUV_FP) -I$(TUV_DIR) -c $<

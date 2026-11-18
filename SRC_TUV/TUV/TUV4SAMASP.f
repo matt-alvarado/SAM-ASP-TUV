@@ -264,8 +264,9 @@
         enddo
       enddo
  
-      ! MM DEBUG
-      ! loop over all layers   
+      ! Floor the optics in every layer so TUV never sees zero or
+      ! negative aerosol optical depth, single-scattering albedo or
+      ! asymmetry (guards against bad input)
       do iz = 1, kz
         do iw = 1, kw      
         !Force non-zero values to protect against input errors
@@ -278,10 +279,9 @@
       enddo
 
       !Top layer (nz-1, the layer below SAM's model top): no aerosol,
-      !at every wavelength
+      !at every wavelength (optical depth at the floor, not zero)
       do iw = 1, kw
-      !dtaer(nz-1, iw) = 0.0
-      dtaer(nz-1, iw) = aer_floor ! MM DEBUG
+      dtaer(nz-1, iw) = aer_floor
       omaer(nz-1,iw) = 1.0
       gaer(nz-1,iw) = 0.0
       enddo
