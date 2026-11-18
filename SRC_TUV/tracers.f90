@@ -120,6 +120,26 @@ REAL*8, allocatable :: jasp(:,:)
       real*8, parameter :: earth_tilt = 23.5 ! earth's tilt (degrees)
 
       REAL*8, DIMENSION(NFastTUVWvl):: ExtCoeff, SingScat, Assym
+
+      ! Layout of the packed ASP inputs and outputs of one plume cell (a
+      ! column of real*8 values, so that cells can be computed on another
+      ! MPI rank; see asp_pack_in and the routines after it). Set by
+      ! asp_buffer_layout_init once the ASP species counts are known. A block
+      ! starting at offset off occupies elements off+1 .. off+(its length).
+      ! Inputs: nhead_in scalars (solar zenith angle, temperature, pressure,
+      ! air density, time step, transmissivity, i, l), then
+      !   in_gas   gas species                 nGas
+      !   in_mass  aerosol mass (bin fastest)  nBins*nSpec
+      !   in_num   particle number             nBins
+      !   in_photo photolysis rates            nPhoto
+      ! Outputs:
+      !   out_gas, out_mass, out_num           as for the inputs
+      !   out_ext, out_ssa, out_asym           aerosol extinction, single-
+      !                                        scattering albedo, asymmetry
+      !                                        (NFastTUVWvl each)
+      integer, parameter :: nhead_in = 8
+      integer :: in_gas, in_mass, in_num, in_photo, asp_nin
+      integer :: out_gas, out_mass, out_num, out_ext, out_ssa, out_asym, asp_nout
 CONTAINS
 
 FUNCTION Find_Chem(Chem) RESULT (Index)
@@ -242,6 +262,7 @@ END FUNCTION
   if (masterproc) write(*,*) 'Initial plume CO from GasPhaseChems.in (ppb): ', CO_init
   ! TUV -> ASP photolysis mapping (PhotoMap.in); stops if it is inconsistent
   call samasp_photo_init(trim(asp_deck_dir), masterproc)
+  call asp_buffer_layout_init()
   allocate(PhotoArr(dimx1_s:dimx2_s, dimy1_s:dimy2_s, nzm, nPhoto), jasp(nzm, nPhoto))
   PhotoArr = 0.
   allocate(GasConc(nGas), AeroNumConc(nBins), AeroMassConc(nBins,nSpec), &
@@ -601,8 +622,8 @@ deallocate(SaltConcBin)
       ! results; then TUV is run for each column.
       call collect_plume_cells(fire_nstep_end, solar_zenith_angle, tstep, &
                                ncell, aspin, cell_ijl, cell_aird)
-      allocate(aspout(asp_nout(), max(ncell,1)))
-      call balanced_compute(dompi, asp_nin(), asp_nout(), ncell, aspin, aspout, asp_cells)
+      allocate(aspout(asp_nout, max(ncell,1)))
+      call balanced_compute(dompi, asp_nin, asp_nout, ncell, aspin, aspout, asp_cells)
       call store_asp_results(ncell, aspout, cell_ijl, cell_aird)
       deallocate(aspin, aspout, cell_ijl, cell_aird)
 
@@ -673,7 +694,7 @@ deallocate(SaltConcBin)
 
    Transmissivity = 1.0
    ncell = 0
-   allocate(aspin(asp_nin(), 64), cell_ijl(3, 64), cell_aird(64))
+   allocate(aspin(asp_nin, 64), cell_ijl(3, 64), cell_aird(64))
    do i=1,nx
       do j=1,ny
          do l=1,nzm
@@ -1019,14 +1040,23 @@ deallocate(SaltConcBin)
 !----------------------------------
 ! ASP inputs and outputs of one plume cell, packed into a column of real*8
 ! values so that cells can be computed on another MPI rank (samasp_balance).
+! The layout is described with the offsets at the top of the module.
 
- integer function asp_nin()
-   asp_nin = 8 + HowManyEvolveGasChems + nBins*nSpec + nBins + nPhoto
- end function asp_nin
+ subroutine asp_buffer_layout_init()
+   in_gas   = nhead_in
+   in_mass  = in_gas + nGas
+   in_num   = in_mass + nBins*nSpec
+   in_photo = in_num + nBins
+   asp_nin  = in_photo + nPhoto
 
- integer function asp_nout()
-   asp_nout = HowManyEvolveGasChems + nBins*nSpec + nBins + 3*NFastTUVWvl
- end function asp_nout
+   out_gas  = 0
+   out_mass = out_gas + nGas
+   out_num  = out_mass + nBins*nSpec
+   out_ext  = out_num + nBins
+   out_ssa  = out_ext + NFastTUVWvl
+   out_asym = out_ssa + NFastTUVWvl
+   asp_nout = out_asym + NFastTUVWvl
+ end subroutine asp_buffer_layout_init
 
  subroutine asp_pack_in(buf, sza, gas, temp, pres_pa, dens, tstep, mass, num, &
                         transm, i, l, photo)
@@ -1034,36 +1064,51 @@ deallocate(SaltConcBin)
    real*8, intent(in) :: sza, gas(:), temp, pres_pa, dens, tstep, mass(:,:), &
                          num(:), transm, photo(:)
    integer, intent(in) :: i, l
-   integer :: k, nG
-   nG = HowManyEvolveGasChems
-   buf(1:8) = (/ sza, temp, pres_pa, dens, tstep, transm, dble(i), dble(l) /)
-   k = 8
-   buf(k+1:k+nG) = gas(1:nG)
-   k = k + nG
-   buf(k+1:k+nBins*nSpec) = reshape(mass(1:nBins,1:nSpec), (/nBins*nSpec/))
-   k = k + nBins*nSpec
-   buf(k+1:k+nBins) = num(1:nBins)
-   k = k + nBins
-   buf(k+1:k+nPhoto) = photo(1:nPhoto)
+   buf(1:nhead_in) = (/ sza, temp, pres_pa, dens, tstep, transm, dble(i), dble(l) /)
+   buf(in_gas+1:in_gas+nGas) = gas(1:nGas)
+   buf(in_mass+1:in_mass+nBins*nSpec) = reshape(mass(1:nBins,1:nSpec), (/nBins*nSpec/))
+   buf(in_num+1:in_num+nBins) = num(1:nBins)
+   buf(in_photo+1:in_photo+nPhoto) = photo(1:nPhoto)
  end subroutine asp_pack_in
+
+ subroutine asp_unpack_in(buf, sza, gas, temp, pres_pa, dens, tstep, mass, num, &
+                          transm, i, l, photo)
+   real*8, intent(in) :: buf(:)
+   real*8, intent(out) :: sza, gas(:), temp, pres_pa, dens, tstep, mass(:,:), &
+                          num(:), transm, photo(:)
+   integer, intent(out) :: i, l
+   sza = buf(1); temp = buf(2); pres_pa = buf(3); dens = buf(4)
+   tstep = buf(5); transm = buf(6); i = nint(buf(7)); l = nint(buf(8))
+   gas(1:nGas) = buf(in_gas+1:in_gas+nGas)
+   mass(1:nBins,1:nSpec) = reshape(buf(in_mass+1:in_mass+nBins*nSpec), (/nBins,nSpec/))
+   num(1:nBins) = buf(in_num+1:in_num+nBins)
+   photo(1:nPhoto) = buf(in_photo+1:in_photo+nPhoto)
+ end subroutine asp_unpack_in
+
+ subroutine asp_pack_out(buf, gas, mass, num, ext, ssa, asym)
+   real*8, intent(out) :: buf(:)
+   real*8, intent(in) :: gas(:), mass(:,:), num(:), ext(:), ssa(:), asym(:)
+   integer :: nW
+   nW = NFastTUVWvl
+   buf(out_gas+1:out_gas+nGas) = gas(1:nGas)
+   buf(out_mass+1:out_mass+nBins*nSpec) = reshape(mass(1:nBins,1:nSpec), (/nBins*nSpec/))
+   buf(out_num+1:out_num+nBins) = num(1:nBins)
+   buf(out_ext+1:out_ext+nW) = ext(1:nW)
+   buf(out_ssa+1:out_ssa+nW) = ssa(1:nW)
+   buf(out_asym+1:out_asym+nW) = asym(1:nW)
+ end subroutine asp_pack_out
 
  subroutine asp_unpack_out(buf, gas, mass, num, ext, ssa, asym)
    real*8, intent(in) :: buf(:)
    real*8, intent(out) :: gas(:), mass(:,:), num(:), ext(:), ssa(:), asym(:)
-   integer :: k, nG, nW
-   nG = HowManyEvolveGasChems; nW = NFastTUVWvl
-   k = 0
-   gas(1:nG) = buf(k+1:k+nG)
-   k = k + nG
-   mass(1:nBins,1:nSpec) = reshape(buf(k+1:k+nBins*nSpec), (/nBins,nSpec/))
-   k = k + nBins*nSpec
-   num(1:nBins) = buf(k+1:k+nBins)
-   k = k + nBins
-   ext(1:nW) = buf(k+1:k+nW)
-   k = k + nW
-   ssa(1:nW) = buf(k+1:k+nW)
-   k = k + nW
-   asym(1:nW) = buf(k+1:k+nW)
+   integer :: nW
+   nW = NFastTUVWvl
+   gas(1:nGas) = buf(out_gas+1:out_gas+nGas)
+   mass(1:nBins,1:nSpec) = reshape(buf(out_mass+1:out_mass+nBins*nSpec), (/nBins,nSpec/))
+   num(1:nBins) = buf(out_num+1:out_num+nBins)
+   ext(1:nW) = buf(out_ext+1:out_ext+nW)
+   ssa(1:nW) = buf(out_ssa+1:out_ssa+nW)
+   asym(1:nW) = buf(out_asym+1:out_asym+nW)
  end subroutine asp_unpack_out
 
  ! Run ASP (SAM_wrapper) for n packed cells
@@ -1072,42 +1117,22 @@ deallocate(SaltConcBin)
    integer, intent(in) :: nin, nout, n
    real*8, intent(in) :: in(nin, n)
    real*8, intent(out) :: out(nout, n)
-   REAL*8 :: GasConc(HowManyEvolveGasChems), AfterGasConc(HowManyEvolveGasChems)
+   REAL*8 :: GasConc(nGas), AfterGasConc(nGas)
    REAL*8 :: MassConc(nBins,nSpec), NumConc(nBins), TermVel(nBins)
    REAL*8 :: PhotolysisRates(nPhoto)
    REAL*8, DIMENSION(NFastTUVWvl) :: Ext, Ssa, Asym
    real*8 :: sza, temptm, prestm, airdens, tstep, transm
-   integer :: c, k, nG, nW, i, l
-   nG = HowManyEvolveGasChems; nW = NFastTUVWvl
+   integer :: c, i, l
    do c = 1, n
-      sza = in(1,c); temptm = in(2,c); prestm = in(3,c); airdens = in(4,c)
-      tstep = in(5,c); transm = in(6,c); i = nint(in(7,c)); l = nint(in(8,c))
-      k = 8
-      GasConc = in(k+1:k+nG,c)
-      k = k + nG
-      MassConc = reshape(in(k+1:k+nBins*nSpec,c), (/nBins,nSpec/))
-      k = k + nBins*nSpec
-      NumConc = in(k+1:k+nBins,c)
-      k = k + nBins
-      PhotolysisRates = in(k+1:k+nPhoto,c)
+      call asp_unpack_in(in(:,c), sza, GasConc, temptm, prestm, airdens, tstep, &
+                         MassConc, NumConc, transm, i, l, PhotolysisRates)
       AfterGasConc = 0.0D0
       if (samasp_verbose) write(*,*) "PhotolysisRates passed to SAM_wrapper: ", PhotolysisRates
       if (samasp_verbose) write(*,*) "Before SAM_wrapper"
       call SAM_wrapper(size(GasConc), size(GasConc), sza, GasConc, temptm, prestm, &
                        airdens, tstep, AfterGasConc, MassConc, NumConc, TermVel, &
                        transm, i, l, PhotolysisRates, Ext, Ssa, Asym)
-      k = 0
-      out(k+1:k+nG,c) = AfterGasConc
-      k = k + nG
-      out(k+1:k+nBins*nSpec,c) = reshape(MassConc, (/nBins*nSpec/))
-      k = k + nBins*nSpec
-      out(k+1:k+nBins,c) = NumConc
-      k = k + nBins
-      out(k+1:k+nW,c) = Ext
-      k = k + nW
-      out(k+1:k+nW,c) = Ssa
-      k = k + nW
-      out(k+1:k+nW,c) = Asym
+      call asp_pack_out(out(:,c), AfterGasConc, MassConc, NumConc, Ext, Ssa, Asym)
    end do
  end subroutine asp_cells
 
