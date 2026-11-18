@@ -3,7 +3,7 @@
 #
 # Copy of the Claude Code cloud environment's setup script (paste it into the
 # environment's settings: cloud environment menu > Edit > Setup script). It
-# writes /opt/samasp-env.sh, which build_ifx.sh / build_gnu.sh source.
+# writes /opt/samasp-env.sh, which build.sh sources.
 # csh is needed by SAM's Build script.
 #
 # Network access for that environment: "Limited" with package managers

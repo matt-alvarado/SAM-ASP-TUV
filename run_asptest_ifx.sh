@@ -4,7 +4,7 @@
 # The run happens in a copy of the repository, because a run overwrites files
 # that are committed (SRC_TUV/ASP/OutputFiles/*, CaseName, RUNS/*/*.nml).
 #
-# Usage: ./build_ifx.sh && ./run_asptest_ifx.sh [run_dir]
+# Usage: ./build.sh && ./run_asptest_ifx.sh [run_dir]
 #   run_dir defaults to ./_run_asptest (git-ignored).
 # Takes about 12 minutes with 16 ranks on 4 cores. A clean finish exits with
 # code 9 (SAM's "reached nstop" code, see SRC_TUV/task_util_MPI.f90).
@@ -13,7 +13,7 @@ cd "$(dirname "$0")"
 TOP=$PWD
 RUN=${1:-$TOP/_run_asptest}
 EXE=SAM_RAD_CAM_MICRO_M2005_w_aero
-[ -x "$EXE" ] || { echo "Build first: ./build_ifx.sh"; exit 1; }
+[ -x "$EXE" ] || { echo "Build first: ./build.sh"; exit 1; }
 
 mkdir -p "$RUN"
 tar --exclude=.git --exclude=_build --exclude=OBJ --exclude=_run_asptest \

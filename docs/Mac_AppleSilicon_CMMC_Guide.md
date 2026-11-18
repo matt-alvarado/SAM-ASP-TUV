@@ -164,9 +164,8 @@ Keep the Mac awake and on power for the length of the run (section 3).
 ## 7. The GNU (gfortran) build
 
 The ARM64 image is the same model, decks and settings, compiled with gfortran
-13.4 and gcc instead of Intel ifx/icx (`build_gnu.sh`, which is
-`build_ifx.sh` with `SAMASP_FC=gfortran`; the Makefiles of SAM, ASP and TUV
-and `UTIL/build_util.sh` have GNU settings).
+13.4 and gcc instead of Intel ifx/icx (`build.sh gnu`; the Makefiles of SAM,
+ASP and TUV and `UTIL/build_util.sh` have GNU settings).
 
 - **Floating point.** Fused multiply-add contraction is turned off
   (`-ffp-contract=off`), so the ARM64 and x86-64 gfortran builds compute the

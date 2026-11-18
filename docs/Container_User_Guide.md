@@ -438,7 +438,7 @@ The image includes SAM's conversion tools in `/opt/sam-asp-tuv/UTIL`
 They are built from source (`UTIL/SRC`) with the model; the repository keeps
 no prebuilt binaries. Outside the container, build them with
 `UTIL/build_util.sh` (all tools), or for example `UTIL/build_util.sh
-stat2nc`; it uses the same environment file as `build_ifx.sh`.
+stat2nc`; it uses the same environment file and `SAMASP_FC` as `build.sh`.
 
 To convert the 2-D field snapshots:
 

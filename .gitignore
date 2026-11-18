@@ -1,4 +1,4 @@
-# Build outputs (see build_ifx.sh and Build)
+# Build outputs (see build.sh and Build)
 /_build/
 /OBJ
 /OUT_2D
