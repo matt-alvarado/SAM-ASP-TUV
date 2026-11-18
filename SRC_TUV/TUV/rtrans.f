@@ -113,11 +113,11 @@
 
       INTEGER MAXCLY, MAXULV, MAXUMU, MAXCMU, MAXPHI
       PARAMETER(MAXCLY=201,MAXULV=201)
-* Array sizes for the number of streams (nstr) and output angles. They are
-* the stream count SAM-ASP-TUV uses (nstr = 4 in INPUTS/samasp): psndo clears
-* its work arrays on every call, and with the original 32 almost all of that
-* clearing was of unused elements (~11% of the run time). psndo stops with an
-* error if nstr exceeds them; raise both here and MXCMU/MXUMU in psndo then.
+* Array sizes for the number of streams (nstr) and output angles: sized for
+* nstr <= 4, the stream count SAM-ASP-TUV uses (INPUTS/samasp). They are kept
+* at that size because psndo clears its work arrays on every call, so unused
+* elements cost run time. psndo stops with an error if nstr exceeds them;
+* to use more streams, raise both here and MXCMU/MXUMU in psndo with nstr.
       PARAMETER(MAXUMU=4,MAXCMU=4)
       PARAMETER(MAXPHI=3)
 
@@ -1146,7 +1146,8 @@ c +-------------------------------------------------------------------+
 c     .. Parameters ..
 
       INTEGER   MXCLY, MXULV, MXCMU, MXUMU, MXPHI, MI, MI9M2, NNLYRI
-c     MXCMU, MXUMU: sized for nstr = 4 (see MAXCMU in rtlink); were 32
+c     MXCMU, MXUMU: sized for nstr <= 4; raise them with nstr, together
+c     with MAXCMU/MAXUMU in rtlink
       PARAMETER ( MXCLY = 201, MXULV = 201, MXCMU = 4, MXUMU = 4,
      &          MXPHI = 3, MI = MXCMU / 2, MI9M2 = 9*MI - 2,
      &          NNLYRI = MXCMU*MXCLY )

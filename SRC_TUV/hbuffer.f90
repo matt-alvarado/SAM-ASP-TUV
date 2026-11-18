@@ -16,9 +16,9 @@ implicit none
 	integer average_type(HBUF_MAX_LENGTH)
 
 	! Name -> entry index (hash table with chaining), built at the end of
-	! hbuf_init. hbuf_put/hbuf_avg_put used to scan all hbuf_length names
-	! on every call (O(hbuf_length) per call; with ~1500 ASP tracers about
-	! 9000 names and 9000 calls per statistics step).
+	! hbuf_init, so that hbuf_put/hbuf_avg_put find a name without scanning
+	! all hbuf_length names: with ~1500 ASP tracers there are about 9000
+	! names and 9000 calls per statistics step.
 	integer :: hb_nbuck = 0
 	integer, allocatable :: hb_head(:), hb_next(:)
 

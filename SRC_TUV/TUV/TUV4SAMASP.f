@@ -272,9 +272,8 @@
         enddo
       enddo
 
-      !Fix top layer, at every wavelength (this used to run after the
-      !iw loop had ended, i.e. with iw = kw+1, out of bounds)
-      !(the top layer is nz-1; it used to be fixed at 193)
+      !Top layer (nz-1, the layer below SAM's model top): no aerosol,
+      !at every wavelength
       do iw = 1, kw
       !dtaer(nz-1, iw) = 0.0
       dtaer(nz-1, iw) = 1.0E-20 ! MM DEBUG

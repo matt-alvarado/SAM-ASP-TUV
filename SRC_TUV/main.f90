@@ -343,7 +343,7 @@ if(masterproc) write(*,*) 'Finished with SAM, exiting...'
 if(masterproc) then
 	! Old (rotor) workflow: move the 2-D output to COMPLETE_RUNS_AEROSOL/, only
 	! if that directory exists. The file name carries the number of MPI ranks,
-	! as written in write_fields3D.f90 (it used to be hard-coded as 12).
+	! as written in write_fields3D.f90.
 	write(rankstr,'(i0)') nsubdomains
 	file2D = './OUT_3D/'//trim(case)//'_'//trim(caseid)//'_'//trim(rankstr)//'.bin2D'
 	cmd = 'if [ -d COMPLETE_RUNS_AEROSOL ] && [ -f '//trim(file2D)//' ]; then set -x; mv '// &

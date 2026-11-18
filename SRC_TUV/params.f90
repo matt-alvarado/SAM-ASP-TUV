@@ -66,8 +66,8 @@ integer:: year0 = 2009
 ! the plume, after the fire emissions have stopped
 real:: asp_co_threshold_ppb = 130.
 ! Print progress and diagnostic messages from tracers_physics, TUV and ASP
-! on every call (every cell, column or wavelength). Off by default: they made
-! tens of MB of log per short run and cost several percent of the run time.
+! on every call (every cell, column or wavelength). Off by default: they add
+! tens of MB of log per short run and several percent to the run time.
 logical:: samasp_verbose = .false.
 character(256):: asp_output_dir = 'SRC_TUV/ASP/OutputFiles/'
 
