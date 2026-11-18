@@ -1,0 +1,15 @@
+! Aerosol optics defaults shared by SAM (tracers.f90) and TUV
+! (TUV4SAMASP.f). Valid as both fixed- and free-form source.
+! They are default REAL, as the literals they stand for, so every use keeps
+! its kind (SAM's REAL*8 arrays get the same default-REAL values).
+!   aer_clear         optical depth (TUV, samAOD) or extinction
+!                     (ExtCoeffArr) of air without aerosol: negligible
+!                     but positive
+!   aer_ssa_default   single-scattering albedo where none is set
+!   aer_asym_default  asymmetry factor where none is set
+!   aer_floor         TUV: optical depths up to this are raised to it;
+!                     albedos and |asymmetry factors| up to it are taken
+!                     as unset and get the defaults above
+      REAL aer_clear, aer_ssa_default, aer_asym_default, aer_floor
+      PARAMETER (aer_clear = 1e-10, aer_floor = 1.0e-20)
+      PARAMETER (aer_ssa_default = 0.99, aer_asym_default = 0.61)

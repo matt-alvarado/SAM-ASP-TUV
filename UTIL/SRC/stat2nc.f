@@ -1,18 +1,37 @@
 c-------------------------------------------------------
+c Converts a SAM statistics file (OUT_STAT/*.stat, written by hbuf_write
+c in SRC_TUV/hbuffer.f90 and read with hbuf_lib.f) to netCDF.
+c
+c The file is Fortran unformatted (sequential); for each statistics time:
+c   record 1  caseid, version
+c   record 2  time (day), dt, nstep, nx, ny, nz, nzm, dx, dy, dz,
+c             adz(nzm), z(nz), pres(nzm), then scalar parameters (sst,
+c             pres0, cloud fractions, fluxes, ...; nparms of them from
+c             sst on, read with HBUF_parms)
+c   record 3  nlen, the number of profiles that follow
+c   then for each of the nlen profiles, four records:
+c             name (character*20), long name (character*80),
+c             units (character*10), data (nzm real*4 values)
+c-------------------------------------------------------
 	implicit none
 	include 'netcdf.inc'
 	include 'hbuf.inc'	
 	
         integer, parameter :: nparms = 68  
+c Array limits: maxtime statistics times, maxlev levels (nzm), and
+c maxbuf values for a profile at all times (ntime*nzm); the run stops
+c if the file has more. nwork: length of the other 1-D work arrays.
+        integer, parameter :: maxtime = 50000, maxlev = 500
+        integer, parameter :: maxbuf = 500000, nwork = 5000
 	integer flag(HBUF_MAX_LENGTH)
 c-------------------------------------------------------	
 	character caseid*40, version*20, filename*148, filename2*148
 	character name*80
 	integer nzm, ntime,npar
-	real time(50000),z(5000),p(5000),dz(500)
-        real f(500000), f1(500000), parms(500000)
-        real tmp(5000), tmp1(5000), tmp2(5000), tmp3(5000)
-        real rho(5000)
+	real time(maxtime),z(nwork),p(nwork),dz(maxlev)
+        real f(maxbuf), f1(maxbuf), parms(maxbuf)
+        real tmp(nwork), tmp1(nwork), tmp2(nwork), tmp3(nwork)
+        real rho(nwork)
 	real cape,cin
 
 	integer i,j,k,l,m
@@ -58,7 +77,7 @@ c Count how many time points in a file:
 	 print*,'stat2nc: no data in ',trim(filename)
 	 stop 1
 	end if
-	if(ntime*nzm.gt.500000.or.ntime.gt.50000.or.nzm.gt.500) then
+	if(ntime*nzm.gt.maxbuf.or.ntime.gt.maxtime.or.nzm.gt.maxlev) then
 	 print*,'stat2nc: too many times or levels:',ntime,nzm
 	 stop 1
 	end if

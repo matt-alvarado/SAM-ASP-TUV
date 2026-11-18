@@ -25,6 +25,9 @@ module tracers
  use samasp_balance, only: balanced_compute
  use ModelParameters, only: PhotoFlag, SetPhotoFlag
  implicit none
+ ! Aerosol optics defaults shared with TUV (aer_clear, aer_ssa_default,
+ ! aer_asym_default, aer_floor)
+ include 'TUV/samaer'
 
  real tracer  (dimx1_s:dimx2_s, dimy1_s:dimy2_s, nzm, 0:ntracers)
  real tracerfire  (dimx1_s:dimx2_s, dimy1_s:dimy2_s, nzm, 0:ntracers)
@@ -140,6 +143,9 @@ REAL*8, allocatable :: jasp(:,:)
       integer, parameter :: nhead_in = 8
       integer :: in_gas, in_mass, in_num, in_photo, asp_nin
       integer :: out_gas, out_mass, out_num, out_ext, out_ssa, out_asym, asp_nout
+      ! Plume cells the buffers of tracers_physics hold at first (doubled
+      ! by grow_cell_buffers when full)
+      integer, parameter :: ncell_buf0 = 64
 CONTAINS
 
 FUNCTION Find_Chem(Chem) RESULT (Index)
@@ -274,17 +280,17 @@ END FUNCTION
   Dens = Press*airmw/(gasc*Temp) ! in kg/m3
   Mgas = GetM()
   ! Clear-sky aerosol optics until ASP has computed them for a cell
-  ExtCoeffArr = 1e-10
-  SingScatArr = 0.99
-  AssymArr = 0.61
+  ExtCoeffArr = aer_clear
+  SingScatArr = aer_ssa_default
+  AssymArr = aer_asym_default
   call tuv4samasp_dims(tuv_kz, tuv_kw, tuv_kj)
   allocate(samAOD(tuv_kz,tuv_kw), samSSA(tuv_kz,tuv_kw), samASYM(tuv_kz,tuv_kw), &
            samvalj(tuv_kj,tuv_kz), samwc(tuv_kw), samjlabel(tuv_kj), &
            samzi(nzm+1), jmid(tuv_kj,nzm))
   samzi(1:nzm+1) = zi(1:nzm+1)/1000.d0 ! km
-  samAOD = 1e-10
-  samSSA = 0.99
-  samASYM = 0.61
+  samAOD = aer_clear
+  samSSA = aer_ssa_default
+  samASYM = aer_asym_default
 
 IF(doAerosols.gt.0) then
 
@@ -694,7 +700,7 @@ deallocate(SaltConcBin)
 
    Transmissivity = 1.0
    ncell = 0
-   allocate(aspin(asp_nin, 64), cell_ijl(3, 64), cell_aird(64))
+   allocate(aspin(asp_nin, ncell_buf0), cell_ijl(3, ncell_buf0), cell_aird(ncell_buf0))
    do i=1,nx
       do j=1,ny
          do l=1,nzm

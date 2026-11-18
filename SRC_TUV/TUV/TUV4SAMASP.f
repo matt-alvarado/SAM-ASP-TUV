@@ -167,6 +167,10 @@
 
       INCLUDE 'samvrb'
 
+* Aerosol optics defaults (shared with SAM's tracers.f90)
+
+      INCLUDE 'samaer'
+
       CHARACTER*1 again
 
 * Save arrays for output:
@@ -209,9 +213,9 @@
 
 * --- END OF DECLARATIONS ---------------------------------------------
 * Aerosol defaults where neither TUV nor SAM sets a value
-      dtaer = 1e-10
-      omaer = 0.99
-      gaer = 0.61
+      dtaer = aer_clear
+      omaer = aer_ssa_default
+      gaer = aer_asym_default
 
 * re-entry point
 
@@ -265,9 +269,11 @@
       do iz = 1, kz
         do iw = 1, kw      
         !Force non-zero values to protect against input errors
-           if (dtaer(iz, iw) .LE. 1.0e-20) dtaer(iz, iw) = 1.0e-20
-           if (omaer(iz, iw) .LE. 1.0e-20) omaer(iz, iw) = 0.99
-           if (ABS(gaer(iz,iw)) .LE. 1.0e-20) gaer(iz,iw) = 0.61
+           if (dtaer(iz, iw) .LE. aer_floor) dtaer(iz, iw) = aer_floor
+           if (omaer(iz, iw) .LE. aer_floor) omaer(iz, iw) =
+     $          aer_ssa_default
+           if (ABS(gaer(iz,iw)) .LE. aer_floor) gaer(iz,iw) =
+     $          aer_asym_default
         enddo
       enddo
 
@@ -275,7 +281,7 @@
       !at every wavelength
       do iw = 1, kw
       !dtaer(nz-1, iw) = 0.0
-      dtaer(nz-1, iw) = 1.0E-20 ! MM DEBUG
+      dtaer(nz-1, iw) = aer_floor ! MM DEBUG
       omaer(nz-1,iw) = 1.0
       gaer(nz-1,iw) = 0.0
       enddo
@@ -568,6 +574,10 @@ c 444  format(1pe11.4,1x,a50)
       REAL*8, INTENT(IN) :: samzi(nsamz+1)
       INTEGER nupper
       REAL ztopsam, dzup
+* Fewest TUV levels above SAM's top (levels about 1 km apart up to zstop)
+* for TUV's upper atmosphere; fewer means kz is too small for SAM's grid
+      INTEGER min_tuv_levels_above_sam
+      PARAMETER (min_tuv_levels_above_sam = 10)
 
 * Wavelength grid:
 
@@ -850,7 +860,7 @@ c      izfix = 0
 * then levels about 1 km apart from SAM's top up to zstop
       ztopsam = REAL(samzi(nsamz+1))
       nupper = MIN(kz - (nsamz+1) - 1, CEILING(zstop - ztopsam))
-      IF (nupper .LT. 10) THEN
+      IF (nupper .LT. min_tuv_levels_above_sam) THEN
          WRITE(*,*) 'tuv4samasp: SAM has too many levels for TUV (kz=',
      $        kz, ', SAM layers=', nsamz, '); increase kz in params'
          STOP

@@ -22,7 +22,16 @@ implicit none
  character *10 units
  character *12 c_z(nzm),c_p(nzm),c_dx, c_dy, c_time
 integer i,j,l,k,n,nfields,nfields1,binnum,irxn
-integer ntrtrack
+! Fields always counted in nfields (37):
+!   U V W PP TABS QV QN QP TKH TKE                                     (10)
+!   TotOA, POA, POA1Aer..POA4Aer, POA1Gas..POA4Gas                     (10)
+!   SOA, SOA1Aer..SOA4Aer, SOA1Gas..SOA4Gas                             (9)
+!   TotK TotNa TotNH4 TotCl TotNO3 TotSO4 TotMg TotCa                   (8)
+! QN and QP are taken off again below without docloud/doprecip; TKH and
+! TKE are written only with dotracers, which SAM-ASP always sets. The others
+! (QRAD, REL, REI, the microphysics fields, the particle number per size
+! bin, the gas species and the J-values) are added as they apply.
+integer, parameter :: nfixed3d = 37
 ! Gas species written to the 3D output, selected by name so that changes
 ! to the order of the ASP mechanism do not change what is written.
 ! Species missing from the mechanism are skipped with a warning.
@@ -294,7 +303,7 @@ do igs = 1, size(jval3d_labels)
               trim(jval3d_labels(igs)), '; not written'
    end if
 end do
-nfields=37+nBins+ngas3d+njval3d ! 37 fixed fields, one particle number per size bin, the gas species and J-values
+nfields=nfixed3d+nBins+ngas3d+njval3d ! fixed fields, one particle number per size bin, the gas species and J-values
 if(.not.docloud) nfields=nfields-1
 if(.not.doprecip) nfields=nfields-1
 !bloss: add 3D outputs for microphysical fields specified by flag_micro3Dout
