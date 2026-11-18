@@ -18,12 +18,12 @@ PLATFORM := $(shell uname -s)
 #ifeq ($(HOSTNAME),rotor)
   # Every setting below can be overridden from the environment or the make
   # command line (see /opt/samasp-env.sh for an ifx + Open MPI example).
-  # The defaults reproduce the original rotor build.
+  # The defaults are the paths and compilers of the rotor (ifort) build.
   # SAM_DIR is set by the Build script to the top of this repository.
   TUV_SRC_DIR ?= $(SAM_DIR)/SRC_TUV/TUV
   ASP_SRC_DIR ?= $(SAM_DIR)/SRC_TUV/ASP
 
-  # Where libAspLibrary.a + ModuleFiles/ and libTuvLibrary.a were built
+  # Where libAspLibrary.a + ModuleFiles/ and libTuvLibrary.a are built
   ASP_LIBRARY_DIR ?= $(ASP_SRC_DIR)
   TUV_LIBRARY_DIR ?= $(TUV_SRC_DIR)
 

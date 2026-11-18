@@ -19,7 +19,7 @@ licence on the dataset pages once. `--pl-file`/`--sl-file` use ERA5 netCDF
 files you already have instead. The `prm` comes from `RUNDATA/prm_template`
 (edit it, or pass `--prm-template`); `--dt`, `--hours` and `--wind-axis` set
 the time step, run length and axis orientation. `--params params.txt` reads
-the old input file format. Tests (offline): `python3 -m unittest discover -s tests`.
+a file of cases (the input format of earlier releases). Tests (offline): `python3 -m unittest discover -s tests`.
 
 ## Building the model
 

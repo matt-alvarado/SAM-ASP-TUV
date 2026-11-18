@@ -1,9 +1,10 @@
 """Write a SAM-ASP case (snd, lsf, sfc, prm, grd, lst) from a MetColumn.
 
 The meteorology is held constant: the same profile is written at NPTS times
-one day apart (SAM needs input times spanning the run). The conversions are
-those of the original create_run.py (NARR version); the wind axes ('Ax', 'Ay')
-and vg use the mean wind over the boundary-layer levels above the ground.
+one day apart (SAM needs input times spanning the run). Temperature becomes
+potential temperature, specific humidity the water vapour mixing ratio, and
+the surface stress u*^2; the wind axes ('Ax', 'Ay') and vg use the mean wind
+over the boundary-layer levels above the ground.
 """
 import datetime as dt
 import os
@@ -13,7 +14,7 @@ import numpy as np
 
 NPTS = 3                                  # times written to snd/lsf/sfc
 P0 = 1000.0                               # hPa, reference for potential temperature
-RC = 8.314472 / 29.19                     # R / cp (as in the original script)
+RC = 8.314472 / 29.19                     # R / cp of air (molar: J mol-1 K-1)
 HOVERT = 8.31432 / (0.0289644 * 9.80665)  # scale height / temperature (m/K)
 RD = 287.05                               # J kg-1 K-1
 WIND_AXES = ('U', 'N', 'S', 'E', 'W', 'T', 'Ax', 'Ay')
