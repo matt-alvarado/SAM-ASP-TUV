@@ -43,7 +43,7 @@ compile-time constants in `SRC_TUV/domain.f90` (`nsubdomains_x`,
 | `SAMASP_ENV` | `build.sh`, `UTIL/build_util.sh` | toolchain environment file to source (default `/opt/samasp-env.sh`; written by `docs/cloud_setup.sh` and the Dockerfiles) |
 | `SAMASP_FC` | `build.sh`, `UTIL/build_util.sh` | `ifx` (default) or `gfortran`; `build.sh`'s first argument overrides it |
 | `LIB_SYS`, `INC_MPI`, `LIB_MPI_DIR`, `INC_NETCDF`, `LIB_NETCDF_DIR`, `LDFLAGS_TOOLCHAIN` | set in the `SAMASP_ENV` file | system library directory, Open MPI and NetCDF(-Fortran) include and library directories, extra linker flags (rpaths) |
-| `SAM_FP`, `TUV_FP`, `ASP_FC_OPTS` | Makefiles | override the floating-point flags (default: precise semantics) |
+| `SAM_FP`, `TUV_FP`, `ASP_FC_OPTS` | Makefiles | override the floating-point flags (default: precise semantics; see docs/SAM_ASP_Interface.md) |
 | `NSUBDOMAINS_X` | Dockerfiles, `docker/build_model.sh` | MPI subdomains in x (= MPI ranks; must divide `nx_gl` = 240 in `domain.f90`); default 16 |
 | `NTRACERS` | Dockerfiles, `docker/build_model.sh` | SAM tracer count for the ASP decks (cases/README.md); default: the value in `domain.f90` |
 | `SAMASP_HOME` | `docker/run_case.py`, tests | model directory (default `/opt/sam-asp-tuv`) |
