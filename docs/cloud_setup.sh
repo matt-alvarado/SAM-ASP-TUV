@@ -2,8 +2,9 @@
 # SAM-ASP-TUV toolchain: Intel ifx (conda-forge), Open MPI, NetCDF (C from apt, Fortran rebuilt with ifx)
 #
 # Copy of the Claude Code cloud environment's setup script (paste it into the
-# environment's settings: cloud environment menu > Edit > Setup script). It
-# writes /opt/samasp-env.sh, which build.sh sources.
+# environment's settings: cloud environment menu > Edit > Setup script); the
+# Ubuntu Dockerfile runs it too, so the image and the cloud environment have
+# the same toolchain. It writes /opt/samasp-env.sh, which build.sh sources.
 # csh is needed by SAM's Build script.
 #
 # Network access for that environment: "Limited" with package managers

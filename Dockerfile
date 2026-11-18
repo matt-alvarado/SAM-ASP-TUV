@@ -7,7 +7,7 @@
 #   git submodule update --init
 #   docker build -t sam-asp-tuv .
 # Options:
-#   --build-arg NSUBDOMAINS_X=8   MPI ranks (subdomains in x; must divide 240)
+#   --build-arg NSUBDOMAINS_X=8   MPI ranks (subdomains in x; must divide nx_gl)
 #   --build-arg NTRACERS=1486     SAM tracer count for decks other than the default
 #                                 (per case in cases/README.md; the model prints
 #                                 the value a deck set needs)
@@ -20,53 +20,24 @@ ARG UBUNTU=docker.io/library/ubuntu:24.04
 # ---------------------------------------------------------------- toolchain
 FROM ${UBUNTU} AS build
 ARG DEBIAN_FRONTEND=noninteractive
+# The toolchain is that of the cloud development environment (docs/cloud_setup.sh):
+# Open MPI and NetCDF-C from Ubuntu, Intel ifx/icx from conda-forge,
+# NetCDF-Fortran rebuilt with ifx (Ubuntu's is built with gfortran), and the
+# environment file /opt/samasp-env.sh that build.sh reads.
+COPY docker/add_build_ca.sh docs/cloud_setup.sh /tmp/
 RUN --mount=type=secret,id=ca,required=false \
-    apt-get update -qq && apt-get install -y -qq --no-install-recommends ca-certificates > /dev/null && \
-    if [ -s /run/secrets/ca ]; then cp /run/secrets/ca /usr/local/share/ca-certificates/build-ca.crt && update-ca-certificates > /dev/null; fi && \
-    sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources && \
     apt-get update -qq && apt-get install -y -qq --no-install-recommends \
-        curl bzip2 xz-utils make perl csh dpkg-dev gfortran \
-        openmpi-bin libopenmpi-dev libnetcdf-dev libhdf5-dev > /dev/null && \
-    rm -rf /var/lib/apt/lists/*
-# Intel ifx and icx (conda-forge)
-RUN mkdir -p /opt/micromamba && cd /opt/micromamba && \
-    curl -sSL https://conda.anaconda.org/conda-forge/linux-64/micromamba-2.10.0-0.tar.bz2 | tar xj bin/micromamba && \
-    MAMBA_ROOT_PREFIX=/opt/micromamba ./bin/micromamba create -y -q -p /opt/intel-ifx -c conda-forge \
-        ifx_linux-64 dpcpp_linux-64 && \
-    rm -rf /opt/micromamba/pkgs
-# NetCDF-Fortran rebuilt with ifx (Ubuntu's is built with gfortran)
-RUN apt-get update -qq && B=$(mktemp -d) && cd $B && \
-    apt-get source -qq --download-only netcdf-fortran && tar xJf netcdf-fortran_*.orig.tar.xz && \
-    cd netcdf-fortran-*/ && \
-    PATH=/opt/intel-ifx/bin:$PATH FC=ifx F77=ifx CC=icx CPPFLAGS=-I/usr/include \
-        LDFLAGS=-L/usr/lib/x86_64-linux-gnu ./configure --prefix=/opt/netcdf-ifx --disable-static -q > /dev/null && \
-    cd fortran && PATH=/opt/intel-ifx/bin:$PATH make -j"$(nproc)" -s > /dev/null 2>&1 && make install -s > /dev/null 2>&1 && \
-    cd / && rm -rf $B /var/lib/apt/lists/*
-RUN printf '%s\n' \
-    'export PATH=/opt/intel-ifx/bin:$PATH' \
-    'export LIB_SYS=/usr/lib/x86_64-linux-gnu' \
-    'export INC_MPI=$LIB_SYS/openmpi/include LIB_MPI_DIR=$LIB_SYS/openmpi/lib' \
-    'export INC_NETCDF=/opt/netcdf-ifx/include LIB_NETCDF_DIR=/opt/netcdf-ifx/lib' \
-    'export LDFLAGS_TOOLCHAIN="-Wl,-rpath,/opt/intel-ifx/lib -Wl,-rpath-link,/opt/intel-ifx/lib -Wl,-rpath-link,$LIB_SYS -Wl,-rpath,/opt/netcdf-ifx/lib"' \
-    > /opt/samasp-env.sh
+        ca-certificates curl make perl dpkg-dev > /dev/null && \
+    sh /tmp/add_build_ca.sh && \
+    bash /tmp/cloud_setup.sh && \
+    rm -rf /opt/micromamba/pkgs /var/lib/apt/lists/*
 
 # ---------------------------------------------------------------- model
 WORKDIR /opt/sam-asp-tuv
 COPY . .
 ARG NSUBDOMAINS_X=16
 ARG NTRACERS=
-RUN test -f SRC_TUV/ASP/src/StepASP4SAM.f90 || \
-        { echo 'ASP source missing: run "git submodule update --init" before docker build'; exit 1; } && \
-    nx=$(sed -n 's/.*nx_gl *= *\([0-9]*\).*/\1/p' SRC_TUV/domain.f90 | head -1) && \
-    [ $((nx % NSUBDOMAINS_X)) -eq 0 ] || { echo "NSUBDOMAINS_X=$NSUBDOMAINS_X must divide nx_gl=$nx"; exit 1; } && \
-    sed -i "s/^\( *integer, parameter :: nsubdomains_x *= *\)[0-9]*/\1${NSUBDOMAINS_X}/" SRC_TUV/domain.f90 && \
-    if [ -n "$NTRACERS" ]; then sed -i "s/^\( *integer, parameter :: ntracers *= *\)[0-9]*/\1${NTRACERS}/" SRC_TUV/domain.f90; fi && \
-    ny=$(sed -n 's/.*nsubdomains_y *= *\([0-9]*\).*/\1/p' SRC_TUV/domain.f90 | head -1) && \
-    echo $((NSUBDOMAINS_X * ny)) > NRANKS && \
-    SAMASP_ENV=/opt/samasp-env.sh ./build_ifx.sh > /tmp/build.out 2>&1 || \
-        { tail -30 /tmp/build.out; tail -40 _build/sam_build.log 2>/dev/null; exit 1; } && \
-    SAMASP_ENV=/opt/samasp-env.sh UTIL/build_util.sh > /dev/null && \
-    rm -rf _build OBJ && \
+RUN docker/build_model.sh ifx && \
     mkdir -p /runtime-libs && \
     ldd SAM_RAD_CAM_MICRO_M2005_w_aero $(sed -n 's/^\//UTIL\//p' UTIL/.gitignore) | awk '$3 ~ /^\/opt\// {print $3}' | \
         sort -u | xargs -I{} cp --parents -L {} /runtime-libs/
@@ -74,14 +45,15 @@ RUN test -f SRC_TUV/ASP/src/StepASP4SAM.f90 || \
 # ---------------------------------------------------------------- runtime
 FROM ${UBUNTU}
 ARG DEBIAN_FRONTEND=noninteractive
+COPY docker/add_build_ca.sh /tmp/
 RUN --mount=type=secret,id=ca,required=false \
     apt-get update -qq && apt-get install -y -qq --no-install-recommends ca-certificates > /dev/null && \
-    if [ -s /run/secrets/ca ]; then cp /run/secrets/ca /usr/local/share/ca-certificates/build-ca.crt && update-ca-certificates > /dev/null; fi && \
+    sh /tmp/add_build_ca.sh && \
     apt-get install -y -qq --no-install-recommends \
         openmpi-bin libnetcdf19t64 python3 python3-numpy python3-netcdf4 python3-pip > /dev/null && \
     pip3 install -q --no-cache-dir --break-system-packages cdsapi && \
     apt-get purge -y -qq python3-pip > /dev/null && apt-get autoremove -y -qq > /dev/null && \
-    rm -f /usr/local/share/ca-certificates/build-ca.crt && update-ca-certificates --fresh > /dev/null && \
+    sh /tmp/add_build_ca.sh --remove && rm /tmp/add_build_ca.sh && \
     rm -rf /var/lib/apt/lists/*
 COPY --from=build /runtime-libs/opt /opt
 COPY --from=build /opt/sam-asp-tuv /opt/sam-asp-tuv
