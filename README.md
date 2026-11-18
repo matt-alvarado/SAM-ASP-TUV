@@ -85,7 +85,7 @@ Run a case, with the ASP input decks and an output directory mounted:
 | run length (hours) | `RUN_HOURS` (`--hours`) | required |
 | ASP input decks | `ASP_DECK_DIR` (`--decks`), a mounted directory | default: decks in the image |
 | fire emission flux | `MASSEMIS` | default 4.86e-6 |
-| fire start (spin-up) step | `FIRE_START_STEP` | default 1080 |
+| fire start (spin-up) step | `FIRE_START_STEP` | default: `fire_nstep_start` in `RUNDATA/prm_template` |
 | time step (s), case name | `DT` (8), `CASE` (fire) | |
 | ERA5 | `CDSAPI_KEY`, or mount `/root/.cdsapirc`, or `ERA5_PL_FILE` + `ERA5_SL_FILE` (mounted files) | |
 | extra SAM namelist settings | `SAM_SET="NAME=VALUE;..."` (`--set NAME=VALUE`) | |

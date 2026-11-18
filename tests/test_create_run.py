@@ -323,8 +323,9 @@ class DownloadAndCase(unittest.TestCase):
         self.assertIn(' nstat = 50,', body)                  # replaced
         self.assertEqual(sum(1 for l in body if l.strip().startswith('nstat =')), 1)
         self.assertIn(' nstatfrq = 5,', body)                # similar name untouched
-        i = body.index(' fire_nstep_start = 0,')             # added before the "/"
-        self.assertIn(" asp_deck_dir = '/decks/',", body)
+        self.assertIn(' fire_nstep_start = 0,', body)       # replaced (set in the template)
+        self.assertEqual(sum(1 for l in body if l.strip().startswith('fire_nstep_start')), 1)
+        i = body.index(" asp_deck_dir = '/decks/',")         # added before the "/"
         close = max(k for k, l in enumerate(body) if l.strip() == '/')   # &PARAMETERS' "/"
         self.assertGreater(close, i)
 

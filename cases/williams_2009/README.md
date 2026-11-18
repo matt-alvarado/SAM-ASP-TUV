@@ -12,7 +12,7 @@ Alvarado et al. (2015, ACP). SAM-ASP-TUV v1.0.0 cases `W1101` and `tuvtest`
 | Start | 2009-11-17 19:00 UTC | `day0 = 321.458` was 11:00; 19:00 UTC (about 11:00 local) is the observation start of the ASP Williams deck |
 | Run length, time step | 5 h, 10 s | `nstop = 1800`, `dt = 10` |
 | Emission flux | `MASSEMIS=3e-05` | `massemis` |
-| Fire start | default (step 1080, 3 h) | not set (default) |
+| Fire start | template value (`fire_nstep_start` in `RUNDATA/prm_template`) | not set (default) |
 
 ## ASP decks (`decks/`)
 

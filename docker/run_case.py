@@ -1,37 +1,10 @@
 #!/usr/bin/env python3
 """Container entry point: build one SAM-ASP-TUV fire case and run it.
 
-Every setting can be given as an option or as an environment variable
-(docker run -e NAME=value ...); options win.
-
-  --lat / LAT              fire latitude (deg N)                     required
-  --lon / LON              fire longitude (deg E)                    required
-  --date / DATE            start date, UTC (YYYY-MM-DD)              required
-  --start / START_TIME     start time, UTC (HH:MM)                   required
-  --hours / RUN_HOURS      run length (h)                            required
-  --decks / ASP_DECK_DIR   directory with the ASP input decks (mount it,
-                           e.g. -v /host/decks:/decks -e ASP_DECK_DIR=/decks);
-                           default: the decks built into the image
-  --massemis / MASSEMIS    fire mass emission flux (prm massemis), default 4.86e-6
-  --fire-start-step / FIRE_START_STEP
-                           step after which fire emissions start (spin-up);
-                           default: the template's (1080 steps)
-  --dt / DT                SAM time step (s), default 8
-  --case / CASE            case name, default "fire"
-  --output / OUTPUT_DIR    where results go, default /output (mount it)
-  --set NAME=VALUE / SAM_SET="NAME=VALUE;NAME=VALUE"
-                           extra SAM &PARAMETERS settings for the case's prm
-                           (Fortran syntax, e.g. perturb_type=2); --set may repeat
-  --check-decks            only check the decks against the model's tracer
-                           count (ntracers) and exit
-  --era5-pl / ERA5_PL_FILE, --era5-sl / ERA5_SL_FILE
-                           use these ERA5 netCDF files (pressure levels,
-                           single levels) instead of downloading
-  ERA5 download: set CDSAPI_KEY (your Copernicus CDS key) or mount a
-  .cdsapirc at /root/.cdsapirc.
-
-Before any work the decks' SAM tracer count is checked against the model's
-ntracers; a mismatch stops the run with the NTRACERS value to build with.
+Every setting is an option or an environment variable (docker run -e
+NAME=value); options win. The ASP decks' tracer count is checked against the
+model's ntracers before any work. ERA5 is downloaded with CDSAPI_KEY or a
+mounted /root/.cdsapirc, unless ERA5_PL_FILE and ERA5_SL_FILE are given.
 
 Outputs in OUTPUT_DIR: OUT_STAT, OUT_3D, OUT_2D, OUT_MOMENTS, OUT_MOVIES,
 RESTART (SAM), ASP/ (ASP output files), case/ (the case's input files,
@@ -120,119 +93,177 @@ def check_tracers(decks, quiet=False):
         print('tracers: %d (%s) = ntracers of this build' % (need, how))
 
 
-def main(argv=None):
+def require_decks(decks):
+    """absolute path of the ASP deck directory; stops if a deck file is missing"""
+    decks = os.path.abspath(decks)
+    absent = [f for f in DECK_FILES if not os.path.isfile(os.path.join(decks, f))]
+    if absent:
+        fail('ASP deck directory %s lacks %s (is it mounted?)' % (decks, ', '.join(absent)))
+    return decks
+
+
+def prm_value(text, name):
+    """value of the uncommented entry `name = value` in prm text, or None"""
+    for line in text.splitlines():
+        line = line.split('!')[0]
+        if '=' in line and line.split('=')[0].strip().lower() == name:
+            return float(line.split('=')[1].strip(' ,').replace('d', 'e'))
+    return None
+
+
+def require_prm_value(text, name, where):
+    v = prm_value(text, name)
+    if v is None:
+        fail('%s does not set %s' % (where, name))
+    return v
+
+
+def parse_args(argv):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--lat', type=float, default=env('LAT'))
-    ap.add_argument('--lon', type=float, default=env('LON'))
-    ap.add_argument('--date', default=env('DATE'))
-    ap.add_argument('--start', default=env('START_TIME'))
-    ap.add_argument('--hours', type=float, default=env('RUN_HOURS'))
-    ap.add_argument('--decks', default=env('ASP_DECK_DIR', os.path.join(MODEL, 'SRC_TUV/ASP/InorganicInputDecks')))
-    ap.add_argument('--massemis', type=float, default=float(env('MASSEMIS', '4.86e-6')))
-    ap.add_argument('--fire-start-step', type=int, default=env('FIRE_START_STEP'))
-    ap.add_argument('--dt', type=float, default=float(env('DT', '8')))
-    ap.add_argument('--case', default=env('CASE', 'fire'))
-    ap.add_argument('--output', default=env('OUTPUT_DIR', '/output'))
-    ap.add_argument('--era5-pl', default=env('ERA5_PL_FILE'))
-    ap.add_argument('--era5-sl', default=env('ERA5_SL_FILE'))
-    ap.add_argument('--set', action='append', default=[], metavar='NAME=VALUE')
-    ap.add_argument('--check-decks', action='store_true')
+
+    def opt(flag, var, help, **kw):
+        kw.setdefault('default', env(var))
+        ap.add_argument(flag, help='%s [env %s]' % (help, var), **kw)
+    opt('--lat', 'LAT', 'fire latitude (deg N); required', type=float)
+    opt('--lon', 'LON', 'fire longitude (deg E); required', type=float)
+    opt('--date', 'DATE', 'start date, UTC (YYYY-MM-DD); required')
+    opt('--start', 'START_TIME', 'start time, UTC (HH:MM); required')
+    opt('--hours', 'RUN_HOURS', 'run length (h); required', type=float)
+    opt('--decks', 'ASP_DECK_DIR', 'directory with the ASP input decks (mount it, e.g. -v /host/decks:/decks '
+        '-e ASP_DECK_DIR=/decks); default: the decks built into the image',
+        default=env('ASP_DECK_DIR', os.path.join(MODEL, 'SRC_TUV/ASP/InorganicInputDecks')))
+    opt('--massemis', 'MASSEMIS', 'fire mass emission flux (prm massemis); default %(default)s',
+        type=float, default=float(env('MASSEMIS', '4.86e-6')))
+    opt('--fire-start-step', 'FIRE_START_STEP', 'step after which fire emissions start (spin-up); '
+        'default: the prm template value', type=int)
+    opt('--dt', 'DT', 'SAM time step (s); default %(default)s', type=float, default=float(env('DT', '8')))
+    opt('--case', 'CASE', 'case name; default %(default)s', default=env('CASE', 'fire'))
+    opt('--output', 'OUTPUT_DIR', 'where results go (mount it); default %(default)s',
+        default=env('OUTPUT_DIR', '/output'))
+    opt('--era5-pl', 'ERA5_PL_FILE', 'ERA5 pressure-level netCDF file to use instead of downloading')
+    opt('--era5-sl', 'ERA5_SL_FILE', 'ERA5 single-level netCDF file to use instead of downloading')
+    ap.add_argument('--set', action='append', default=[], metavar='NAME=VALUE',
+                    help='extra SAM &PARAMETERS setting for the case\'s prm (Fortran syntax, e.g. '
+                    'perturb_type=2); repeatable [env SAM_SET="NAME=VALUE;NAME=VALUE"]')
+    ap.add_argument('--check-decks', action='store_true',
+                    help='only check the decks against the model\'s tracer count (ntracers) and exit')
     a = ap.parse_args(argv)
+    a.set = [s.strip() for s in (env('SAM_SET') or '').split(';') if s.strip()] + a.set
+    return a
 
-    if a.check_decks:
-        decks = os.path.abspath(a.decks)
-        absent = [f for f in DECK_FILES if not os.path.isfile(os.path.join(decks, f))]
-        if absent:
-            fail('ASP deck directory %s lacks %s (is it mounted?)' % (decks, ', '.join(absent)))
-        check_tracers(decks)
-        return 0
 
+def validate_inputs(a):
+    """stop before any work if a setting, the decks or the ERA5 source is missing,
+    or if the decks need another tracer count; -> absolute deck directory"""
     missing = [n for n, v in (('lat/LAT', a.lat), ('lon/LON', a.lon), ('date/DATE', a.date),
                               ('start/START_TIME', a.start), ('hours/RUN_HOURS', a.hours)) if v is None]
     if missing:
         fail('set ' + ', '.join(missing) + ' (see --help)')
-    decks = os.path.abspath(a.decks)
-    absent = [f for f in DECK_FILES if not os.path.isfile(os.path.join(decks, f))]
-    if absent:
-        fail('ASP deck directory %s lacks %s (is it mounted?)' % (decks, ', '.join(absent)))
+    decks = require_decks(a.decks)
     check_tracers(decks)
     if bool(a.era5_pl) != bool(a.era5_sl):
         fail('give both ERA5_PL_FILE and ERA5_SL_FILE, or neither')
     if not a.era5_pl and not (env('CDSAPI_KEY') or os.path.exists(os.path.expanduser('~/.cdsapirc'))):
         fail('no ERA5 source: set CDSAPI_KEY (Copernicus CDS key), mount a .cdsapirc at '
              '/root/.cdsapirc, or give ERA5_PL_FILE and ERA5_SL_FILE')
+    return decks
 
-    out = os.path.abspath(a.output)
-    os.makedirs(os.path.join(out, 'ASP'), exist_ok=True)
-    nstop = int(round(a.hours * 3600.0 / a.dt))
-    with open(os.path.join(MODEL, 'NRANKS')) as f:
-        nranks = int(f.read())
 
-    # 1. the case (meteorology from ERA5, prm from the template)
+def case_settings(a, decks, out, nstop, template):
+    """&PARAMETERS settings passed to create_run.py; the user's --set/SAM_SET come last and win"""
     sets = ["asp_deck_dir='%s/'" % decks.rstrip('/'),
             "asp_output_dir='%s/'" % os.path.join(out, 'ASP')]
-    if nstop < 100:                                    # SAM: nstat must not exceed nstop
+    with open(template) as f:
+        nstat = require_prm_value(f.read(), 'nstat', template)
+    if nstop < nstat:                                  # SAM: nstat must not exceed nstop
         sets.append('nstat=%d' % nstop)
     if a.fire_start_step is not None:
         sets.append('fire_nstep_start=%d' % a.fire_start_step)
-    sets += [s.strip() for s in (env('SAM_SET') or '').split(';') if s.strip()] + a.set
+    return sets + a.set
+
+
+def build_case(a, decks, out, nstop):
+    """write RUNS/<case>/ with create_run.py (ERA5 meteorology, prm from the template),
+    copy it to OUTPUT_DIR/case; -> the case's prm text"""
+    template = os.path.join(MODEL, 'RUNDATA', 'prm_template')
     cmd = [sys.executable, os.path.join(MODEL, 'create_run.py'), '--case', a.case,
            '--lat', str(a.lat), '--lon', str(a.lon), '--time', '%sT%s' % (a.date, a.start),
            '--massemis', repr(a.massemis), '--dt', repr(a.dt), '--hours', repr(a.hours),
            '--rundir', MODEL, '--cache', os.path.join(out, 'ERA5_cache')]
     if a.era5_pl:
         cmd += ['--pl-file', a.era5_pl, '--sl-file', a.era5_sl]
-    for s in sets:
+    for s in case_settings(a, decks, out, nstop, template):
         cmd += ['--set', s]
     subprocess.run(cmd, check=True)
     casedir = os.path.join(MODEL, 'RUNS', a.case)
     shutil.copytree(casedir, os.path.join(out, 'case'), dirs_exist_ok=True)
-
-    # fire timing (SAM: emissions on steps fire_nstep_start+1 .. + 2*(plume_y-dy)/vg/dt)
     with open(os.path.join(casedir, 'prm')) as f:
-        prm = f.read()
+        return f.read()
 
-    def prm_value(name, default):
-        for l in prm.splitlines():
-            l = l.split('!')[0]
-            if '=' in l and l.split('=')[0].strip().lower() == name:
-                return float(l.split('=')[1].strip(' ,').replace('d', 'e'))
-        return default
-    fstart = int(prm_value('fire_nstep_start', 1080))     # params.f90 default
-    vg, plume_y, dy = prm_value('vg', 0.0), prm_value('plume_y', 0.0), prm_value('dy', 0.0)
-    fend = fstart + (2 * (plume_y - dy) / vg / a.dt if vg > 0 else float('inf'))
+
+def report_fire_window(prm, nstop, dt, nranks):
+    """print the steps with fire emissions (SAM: fire_nstep_start+1 .. + 2*(plume_y-dy)/vg/dt)
+    and warn if the run ends before they start or end; -> (first step, last step)"""
+    fstart = int(require_prm_value(prm, 'fire_nstep_start', 'the case prm'))
+    vg, plume_y, dy = (require_prm_value(prm, n, 'the case prm') for n in ('vg', 'plume_y', 'dy'))
+    fend = fstart + (2 * (plume_y - dy) / vg / dt if vg > 0 else float('inf'))
     print('run: %d steps of %g s; fire emissions from step %d to ~%.0f; %d MPI ranks'
-          % (nstop, a.dt, fstart, fend, nranks))
+          % (nstop, dt, fstart, fend, nranks))
     if nstop <= fstart:
         print('WARNING: the run ends before the fire starts (no fire emissions); '
               'increase RUN_HOURS or set FIRE_START_STEP')
     elif nstop <= fend:
         print('WARNING: the run ends before the fire emissions end; ASP chemistry starts after them')
+    return fstart, fend
 
-    # 2. run SAM in the model directory, outputs to OUTPUT_DIR
-    os.chdir(MODEL)
-    with open('CaseName', 'w') as f:
-        f.write(a.case + '\n')
+
+def link_outputs(case, out):
+    """in the model directory: set CaseName and point SAM's output directories at OUTPUT_DIR"""
+    with open(os.path.join(MODEL, 'CaseName'), 'w') as f:
+        f.write(case + '\n')
     for d in SAM_OUT:
         os.makedirs(os.path.join(out, d), exist_ok=True)
-        if os.path.islink(d) or os.path.isfile(d):
-            os.remove(d)
-        elif os.path.isdir(d):
-            shutil.rmtree(d)
-        os.symlink(os.path.join(out, d), d)
+        link = os.path.join(MODEL, d)
+        if os.path.islink(link) or os.path.isfile(link):
+            os.remove(link)
+        elif os.path.isdir(link):
+            shutil.rmtree(link)
+        os.symlink(os.path.join(out, d), link)
+
+
+def run_sam(out, nranks, nstop):
+    """run SAM with MPI in the model directory, log to OUTPUT_DIR/run.out; -> exit code"""
     try:
         resource.setrlimit(resource.RLIMIT_STACK, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
     except (ValueError, OSError):
         print('WARNING: could not lift the stack limit; run the container with --ulimit stack=-1')
     # Ubuntu names it mpirun.openmpi; elsewhere (e.g. the RHEL 9 image) it is mpirun
     mpirun = shutil.which('mpirun.openmpi') or shutil.which('mpirun') or 'mpirun'
-    with open(os.path.join(out, 'run.out'), 'w') as log:
-        rc = subprocess.run([mpirun, '--allow-run-as-root', '--oversubscribe',
-                             '-np', str(nranks), './' + EXE], stdout=log, stderr=subprocess.STDOUT).returncode
-    last = [l for l in open(os.path.join(out, 'run.out'), errors='replace') if 'NSTEP =' in l]
+    runlog = os.path.join(out, 'run.out')
+    with open(runlog, 'w') as log:
+        rc = subprocess.run([mpirun, '--allow-run-as-root', '--oversubscribe', '-np', str(nranks), './' + EXE],
+                            cwd=MODEL, stdout=log, stderr=subprocess.STDOUT).returncode
+    last = [l for l in open(runlog, errors='replace') if 'NSTEP =' in l]
     step = int(last[-1].split()[2]) if last else 0
-    print('SAM finished at step %d of %d (exit code %d); log: %s' % (step, nstop, rc, os.path.join(out, 'run.out')))
+    print('SAM finished at step %d of %d (exit code %d); log: %s' % (step, nstop, rc, runlog))
     return 0 if step >= nstop else (rc or 1)
+
+
+def main(argv=None):
+    a = parse_args(argv)
+    if a.check_decks:
+        check_tracers(require_decks(a.decks))
+        return 0
+    decks = validate_inputs(a)
+    out = os.path.abspath(a.output)
+    os.makedirs(os.path.join(out, 'ASP'), exist_ok=True)
+    nstop = int(round(a.hours * 3600.0 / a.dt))
+    with open(os.path.join(MODEL, 'NRANKS')) as f:
+        nranks = int(f.read())
+    prm = build_case(a, decks, out, nstop)
+    report_fire_window(prm, nstop, a.dt, nranks)
+    link_outputs(a.case, out)
+    return run_sam(out, nranks, nstop)
 
 
 if __name__ == '__main__':

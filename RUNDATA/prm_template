@@ -50,6 +50,7 @@
  nrestart_skip = {nstop},
 
  nprint = 100,
+ ! statistics interval (steps); docker/run_case.py lowers it to nstop for shorter runs
  nstat = 100,
  nstatfrq = 5,
 
@@ -80,8 +81,11 @@
  vg = {vg},
  plume_y = 1000.,
 
- ! SAM-ASP-TUV settings (defaults shown; uncomment to change):
- ! fire_nstep_start = 1080,              ! fire emissions start after this step
+ ! fire emissions start after this step (spin-up); docker/run_case.py
+ ! reads the value here
+ fire_nstep_start = 1080,
+
+ ! Other SAM-ASP-TUV settings (defaults shown; uncomment to change):
  ! fire_i1 = 100, fire_i2 = 115,         ! fire box: global x indices
  ! fire_k1 = 32, fire_k2 = 55,           !           and levels
  ! asp_co_threshold_ppb = 130.,          ! ASP runs where CO exceeds this
