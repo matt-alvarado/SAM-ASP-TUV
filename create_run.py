@@ -10,20 +10,18 @@ For the fire's location and time this writes
   prm  namelist, from a template (default RUNDATA/prm_template)
   grd, lst, and met_source.txt (where the meteorology came from)
 The meteorology is held constant over the run (the same profile at 3 times,
-one day apart). SAM's y axis is aligned with the boundary-layer wind
-(--wind-axis Ay, as before), and vg (the plume transport speed in prm) is the
+one day apart). By default SAM's y axis is aligned with the boundary-layer wind
+(--wind-axis Ay), and vg (the plume transport speed in prm) is the
 mean boundary-layer wind along y.
 
 Examples
   python3 create_run.py --case W1101 --lat 39.69583 --lon -122.6 \\
                         --time 2009-12-17T10:00 --massemis 4.86e-6
-  python3 create_run.py --case W1101 --params params.txt     # old input file
+  python3 create_run.py --case W1101 --params params.txt     # cases from a file
 
 ERA5 is downloaded from the Copernicus Climate Data Store; this needs the
 cdsapi package and a CDS key in ~/.cdsapirc (see samasp_case/era5.py). Use
 --pl-file/--sl-file to use ERA5 netCDF files you already have instead.
-Replaces the NARR/NCEP version of this script (in git history before
-this change).
 """
 import argparse
 import datetime as dt
@@ -45,7 +43,7 @@ def parse_time(s):
 
 
 def read_params(path):
-    """Cases from the original params.txt: a header line, then
+    """Cases from a params.txt file: a header line, then
     lat,lon,year,month,day,hour,minute,massemis per line"""
     cases = []
     with open(path) as f:
@@ -65,7 +63,7 @@ def main(argv=None):
     ap.add_argument('--lon', type=float, help='fire longitude (deg E, -180..360)')
     ap.add_argument('--time', type=parse_time, help='start time, UTC (YYYY-MM-DDTHH:MM)')
     ap.add_argument('--massemis', type=float, help='mass emission flux of the fire (prm massemis)')
-    ap.add_argument('--params', help='take lat, lon, time and massemis from an old-style params.txt '
+    ap.add_argument('--params', help='take lat, lon, time and massemis from a params.txt file '
                     '(several lines give cases <case>_01, <case>_02, ...)')
     ap.add_argument('--rundir', default=HERE, help='SAM-ASP-TUV checkout (default: this script\'s directory)')
     ap.add_argument('--prm-template', help='prm template (default <rundir>/RUNDATA/prm_template)')

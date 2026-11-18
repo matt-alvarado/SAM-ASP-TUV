@@ -19,7 +19,34 @@ licence on the dataset pages once. `--pl-file`/`--sl-file` use ERA5 netCDF
 files you already have instead. The `prm` comes from `RUNDATA/prm_template`
 (edit it, or pass `--prm-template`); `--dt`, `--hours` and `--wind-axis` set
 the time step, run length and axis orientation. `--params params.txt` reads
-the old input file format. Tests (offline): `python3 -m unittest discover -s tests`.
+a file of cases (the input format of earlier releases). Tests (offline): `python3 -m unittest discover -s tests`.
+
+## Building the model
+
+    git submodule update --init                       # ASP source (common_ASP)
+    SAMASP_ENV=/opt/samasp-env.sh ./build.sh          # Intel ifx/icx
+    SAMASP_ENV=/path/to/env.sh ./build.sh gnu         # GNU gfortran/gcc
+    SAMASP_ENV=/opt/samasp-env.sh UTIL/build_util.sh  # post-processing tools
+
+`build.sh` builds ASP and TUV out of tree in `_build/`, then SAM
+(`SAM_RAD_CAM_MICRO_M2005_w_aero`); `./build.sh clean` starts afresh.
+`build_ifx.sh` and `build_gnu.sh` are kept as aliases of `build.sh` and
+`build.sh gnu`. The number of MPI subdomains and the number of tracers are
+compile-time constants in `SRC_TUV/domain.f90` (`nsubdomains_x`,
+`ntracers`); the container builds set them from `NSUBDOMAINS_X` and
+`NTRACERS`.
+
+### Build variables
+
+| Variable | Used by | Meaning |
+|---|---|---|
+| `SAMASP_ENV` | `build.sh`, `UTIL/build_util.sh` | toolchain environment file to source (default `/opt/samasp-env.sh`; written by `docs/cloud_setup.sh` and the Dockerfiles) |
+| `SAMASP_FC` | `build.sh`, `UTIL/build_util.sh` | `ifx` (default) or `gfortran`; `build.sh`'s first argument overrides it |
+| `LIB_SYS`, `INC_MPI`, `LIB_MPI_DIR`, `INC_NETCDF`, `LIB_NETCDF_DIR`, `LDFLAGS_TOOLCHAIN` | set in the `SAMASP_ENV` file | system library directory, Open MPI and NetCDF(-Fortran) include and library directories, extra linker flags (rpaths) |
+| `SAM_FP`, `TUV_FP`, `ASP_FC_OPTS` | Makefiles | override the floating-point flags (default: precise semantics; see docs/SAM_ASP_Interface.md) |
+| `NSUBDOMAINS_X` | Dockerfiles, `docker/build_model.sh` | MPI subdomains in x (= MPI ranks; must divide `nx_gl` = 240 in `domain.f90`); default 16 |
+| `NTRACERS` | Dockerfiles, `docker/build_model.sh` | SAM tracer count for the ASP decks (cases/README.md); default: the value in `domain.f90` |
+| `SAMASP_HOME` | `docker/run_case.py`, tests | model directory (default `/opt/sam-asp-tuv`) |
 
 ## Running in a container
 
@@ -33,7 +60,7 @@ RHEL VM in a CMMC Level 2 (CUI) enclave, with rootless Podman. `Dockerfile.ubi9`
 builds the same image on Red Hat's Universal Base Image 9 (RHEL 9), and
 `Dockerfile.ubi9-gnu` builds it with gfortran for ARM64 (Apple silicon; see
 [docs/Mac_AppleSilicon_CMMC_Guide.md](docs/Mac_AppleSilicon_CMMC_Guide.md)).
-`build_gnu.sh` builds the model with the GNU compilers outside a container.
+See "Building the model" below for builds outside a container.
 
 The `Dockerfile` builds the model (Intel ifx, Open MPI, NetCDF) and runs one
 fire case per container. Build once (the common_ASP submodule must be checked
@@ -58,7 +85,7 @@ Run a case, with the ASP input decks and an output directory mounted:
 | run length (hours) | `RUN_HOURS` (`--hours`) | required |
 | ASP input decks | `ASP_DECK_DIR` (`--decks`), a mounted directory | default: decks in the image |
 | fire emission flux | `MASSEMIS` | default 4.86e-6 |
-| fire start (spin-up) step | `FIRE_START_STEP` | default 1080 |
+| fire start (spin-up) step | `FIRE_START_STEP` | default: `fire_nstep_start` in `RUNDATA/prm_template` |
 | time step (s), case name | `DT` (8), `CASE` (fire) | |
 | ERA5 | `CDSAPI_KEY`, or mount `/root/.cdsapirc`, or `ERA5_PL_FILE` + `ERA5_SL_FILE` (mounted files) | |
 | extra SAM namelist settings | `SAM_SET="NAME=VALUE;..."` (`--set NAME=VALUE`) | |

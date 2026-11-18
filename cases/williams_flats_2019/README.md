@@ -12,11 +12,11 @@ variants `_v1` ... `_v10`, whose saved SAM settings are identical).
 | Run length, time step | 8 h, 10 s | `nstop = 2880`, `dt = 10` |
 | Emission flux | `MASSEMIS=8.3e-07` | `massemis` |
 | Warm-bubble start | `SAM_SET`: `perturb_type=2`, bubble at x = 60 km, z = 1.5 km, 1 km x 100 m, +10 K | `perturb_type`, `bubble_*` |
-| Fire start | default (step 1080, 3 h) | not set (default) |
+| Fire start | template value (`fire_nstep_start` in `RUNDATA/prm_template`) | not set (default) |
 
-The plume deposition velocity `vg` now comes from the ERA5 boundary-layer
-wind (it was 0.34 m/s with the original sounding), and the meteorology from
-ERA5 instead of the `SND1` `snd`, `lsf` and `sfc` files.
+The plume transport speed `vg` comes from the ERA5 boundary-layer wind
+(the original sounding gave 0.34 m/s), and the meteorology from ERA5, not
+from the `SND1` `snd`, `lsf` and `sfc` files.
 
 ## ASP decks (`decks/`)
 

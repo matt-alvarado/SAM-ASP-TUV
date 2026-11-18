@@ -246,7 +246,7 @@ Options win over variables.
 | `RUN_HOURS` | `--hours` | Run length in hours, including spin-up (see [section 8](#8-choosing-the-run-length-spin-up-and-fire-timing)) | **required** |
 | `ASP_DECK_DIR` | `--decks` | Directory, inside the container, with the ASP input decks; mount it with `-v` | the image's `SRC_TUV/ASP/InorganicInputDecks` |
 | `MASSEMIS` | `--massemis` | Fire mass emission flux (namelist `massemis`) | `4.86e-6` |
-| `FIRE_START_STEP` | `--fire-start-step` | Fire emissions start after this time step (the spin-up) | `1080` (from the `prm` template) |
+| `FIRE_START_STEP` | `--fire-start-step` | Fire emissions start after this time step (the spin-up) | `fire_nstep_start` in `RUNDATA/prm_template` |
 | `DT` | `--dt` | SAM time step, seconds | `8` |
 | `CASE` | `--case` | Case name (used in output file names) | `fire` |
 | `OUTPUT_DIR` | `--output` | Output directory inside the container | `/output` |
@@ -406,8 +406,8 @@ want to study:
 RUN_HOURS ≈ (FIRE_START_STEP + emission steps) × DT / 3600 + plume age (h)
 ```
 
-With the defaults (1080 steps × 8 s = 2.4 h of spin-up), a 2-hour-old plume
-needs about `RUN_HOURS=4.5`. The entry point prints the computed fire window
+With the template's spin-up (`fire_nstep_start` in `RUNDATA/prm_template`;
+at `DT=8` it is 2.4 h), a 2-hour-old plume needs about `RUN_HOURS=4.5`. The entry point prints the computed fire window
 and warns if the run ends before the fire starts or before its emissions
 end.
 
@@ -438,7 +438,7 @@ The image includes SAM's conversion tools in `/opt/sam-asp-tuv/UTIL`
 They are built from source (`UTIL/SRC`) with the model; the repository keeps
 no prebuilt binaries. Outside the container, build them with
 `UTIL/build_util.sh` (all tools), or for example `UTIL/build_util.sh
-stat2nc`; it uses the same environment file as `build_ifx.sh`.
+stat2nc`; it uses the same environment file and `SAMASP_FC` as `build.sh`.
 
 To convert the 2-D field snapshots:
 

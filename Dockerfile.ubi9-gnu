@@ -11,7 +11,7 @@
 # Options:
 #   --build-arg BASE=<image>       RHEL 9 base image, e.g. your organization's
 #                                  hardened UBI 9 (default: Red Hat's UBI 9.8)
-#   --build-arg NSUBDOMAINS_X=8    MPI ranks (subdomains in x; must divide 240)
+#   --build-arg NSUBDOMAINS_X=8    MPI ranks (subdomains in x; must divide nx_gl)
 #   --build-arg NTRACERS=1486      SAM tracer count for decks other than the default
 #                                  (per case in cases/README.md; the model prints
 #                                  the value a deck set needs)
@@ -34,8 +34,9 @@ ARG BASE=registry.access.redhat.com/ubi9/ubi:9.8
 # ---------------------------------------------------------------- toolchain
 FROM ${BASE} AS build
 ENV SSL_CERT_FILE=/etc/pki/tls/certs/ca-bundle.crt
+COPY docker/add_build_ca.sh /tmp/
 RUN --mount=type=secret,id=ca,required=false \
-    if [ -s /run/secrets/ca ]; then cp /run/secrets/ca /etc/pki/ca-trust/source/anchors/build-ca.pem && update-ca-trust; fi && \
+    sh /tmp/add_build_ca.sh && \
     dnf -y -q install bzip2 xz perl diffutils findutils > /dev/null && dnf clean all > /dev/null
 RUN case "$(uname -m)" in x86_64) plat=linux-64 ;; aarch64) plat=linux-aarch64 ;; \
         *) echo "unsupported architecture $(uname -m)"; exit 1 ;; esac && \
@@ -59,18 +60,7 @@ WORKDIR /opt/sam-asp-tuv
 COPY . .
 ARG NSUBDOMAINS_X=16
 ARG NTRACERS=
-RUN test -f SRC_TUV/ASP/src/StepASP4SAM.f90 || \
-        { echo 'ASP source missing: run "git submodule update --init" before the build'; exit 1; } && \
-    nx=$(sed -n 's/.*nx_gl *= *\([0-9]*\).*/\1/p' SRC_TUV/domain.f90 | head -1) && \
-    [ $((nx % NSUBDOMAINS_X)) -eq 0 ] || { echo "NSUBDOMAINS_X=$NSUBDOMAINS_X must divide nx_gl=$nx"; exit 1; } && \
-    sed -i "s/^\( *integer, parameter :: nsubdomains_x *= *\)[0-9]*/\1${NSUBDOMAINS_X}/" SRC_TUV/domain.f90 && \
-    if [ -n "$NTRACERS" ]; then sed -i "s/^\( *integer, parameter :: ntracers *= *\)[0-9]*/\1${NTRACERS}/" SRC_TUV/domain.f90; fi && \
-    ny=$(sed -n 's/.*nsubdomains_y *= *\([0-9]*\).*/\1/p' SRC_TUV/domain.f90 | head -1) && \
-    echo $((NSUBDOMAINS_X * ny)) > NRANKS && \
-    SAMASP_ENV=/opt/samasp-env.sh ./build_gnu.sh > /tmp/build.out 2>&1 || \
-        { tail -30 /tmp/build.out; tail -40 _build/sam_build.log 2>/dev/null; exit 1; } && \
-    SAMASP_FC=gfortran SAMASP_ENV=/opt/samasp-env.sh UTIL/build_util.sh > /dev/null && \
-    rm -rf _build OBJ
+RUN docker/build_model.sh gnu
 # keep only the run-time part of the conda environment (no compilers, headers or static libraries)
 RUN cd /opt/deps && \
     rm -rf include share/doc share/man share/info conda-meta/*.json.bak libexec lib/gcc \
@@ -80,12 +70,13 @@ RUN cd /opt/deps && \
 # ---------------------------------------------------------------- runtime
 FROM ${BASE}
 ENV REQUESTS_CA_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt
+COPY docker/add_build_ca.sh /tmp/
 RUN --mount=type=secret,id=ca,required=false \
-    if [ -s /run/secrets/ca ]; then cp /run/secrets/ca /etc/pki/ca-trust/source/anchors/build-ca.pem && update-ca-trust; fi && \
+    sh /tmp/add_build_ca.sh && \
     dnf -y -q install python3 python3-numpy python3-requests python3-pip > /dev/null && \
     pip3 install -q --no-cache-dir --only-binary=netCDF4,cftime,numpy cdsapi==0.7.7 netCDF4==1.6.5 cftime==1.6.4.post1 && \
     dnf -y -q remove python3-pip > /dev/null && dnf clean all > /dev/null && rm -rf /var/cache/dnf && \
-    rm -f /etc/pki/ca-trust/source/anchors/build-ca.pem && update-ca-trust
+    sh /tmp/add_build_ca.sh --remove && rm /tmp/add_build_ca.sh
 COPY --from=build /opt/deps /opt/deps
 COPY --from=build /opt/sam-asp-tuv /opt/sam-asp-tuv
 ENV SAMASP_HOME=/opt/sam-asp-tuv \

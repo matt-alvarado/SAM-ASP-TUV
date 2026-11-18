@@ -18,6 +18,6 @@ one), so this case's emissions and smoke aerosol must be supplied: put a deck
 set in `decks/`, set `ASP_DECK_DIR`, and build an image with the `NTRACERS`
 value the model reports.
 
-The original run (900 steps) ends before the default fire start (step 1080),
+The original run (900 steps) ends before the template's fire start (`fire_nstep_start`),
 so set `RUN_HOURS` longer or `FIRE_START_STEP` (for example
 `FIRE_START_STEP=0` with a separate spin-up).
