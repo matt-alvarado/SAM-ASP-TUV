@@ -44,6 +44,9 @@
 *        isamax
 *        D1MACT
 *        r1mach
+* ErrMsT, WrtBaT, WrtDiT, TstBaT and D1MACT are TUV's ErrMsg, WrtBad, WrtDim,
+* TstBad and D1MACH, renamed because ASP (common_ASP) links routines of the
+* same names into the same executable.
 *=============================================================================*
 
       SUBROUTINE rtlink(nstr, nz, 

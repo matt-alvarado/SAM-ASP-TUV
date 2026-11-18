@@ -183,7 +183,7 @@ END FUNCTION
   use Condensation
   use OutputRoutines
   use Coagulation   
-  integer i,j,k,l,ntr,ntrtrack,NumAqChems ,NumOrgChems,NumAqOrgChems,NumAq,PART,B
+  integer i,j,k,l,ntr,NumAqChems ,NumOrgChems,NumAqOrgChems,NumAq,PART,B
   integer binnum,temp_num,aerosol_track
 
   Integer :: 	KNO3i, KCli, KHSO4i, &
@@ -466,19 +466,19 @@ do i=1,nx
             boxmass = dble(airdens*(boxvol/1.0d6)) ! in kg_air!
 
             !massemis kg burned m-2 s-1
-            ntrtrack = 1
+            ! Tracer indices from samasp_layout (itr_gas, itr_mass, itr_num);
+            ! aerosol species j of bin B: 1..nAq aqueous (water first), then
+            ! nAq+1..nAq+nOrg organic, then the aqueous organic species
 
             !Gas Phase Chems
             do ntr=1,HowManyEvolveGasChems
 
                 ! assuming dry air
-		tracer(i,j,l,ntr)= (GasPhaseBackground(ntr)*GasMolecularMass(ntr))/(Mgas*airmw) !kg/kg_air
+		tracer(i,j,l,itr_gas(ntr))= (GasPhaseBackground(ntr)*GasMolecularMass(ntr))/(Mgas*airmw) !kg/kg_air
   
                 ! GasPhaseEmisFactor ! g/kg_burned
                 ! massemis ! kg m-2 s-1 
-		tracerfire(i,j,l,ntr) = (GasPhaseEmisFactor(ntr)*massemis*boxarea*dt*g_to_kg/boxmass)!kg/kg_air
-		ntrtrack = ntrtrack+1
-
+		tracerfire(i,j,l,itr_gas(ntr)) = (GasPhaseEmisFactor(ntr)*massemis*boxarea*dt*g_to_kg/boxmass)!kg/kg_air
             enddo
 
             ! Initializing Aerosols
@@ -496,43 +496,37 @@ do i=1,nx
                part_conc = GasPhaseEmisFactor(iCOg)*cur%numberofparticles/CO_conc ! #/kg_burned
 
                ! water
-               tracer(i,j,l,ntrtrack) = (env%AqChems(1))*(env%numberofparticles*AqMolecularMass(1))/(Mgas/Av*airmw)	! convert mol/cm3 to kg/kg_air
-               tracerfire(i,j,l,ntrtrack) = (cur%AqChems(1))*AqMolecularMass(1)*part_conc*massemis*boxarea*dt*g_to_kg/boxmass
-               ntrtrack = ntrtrack+1
+               tracer(i,j,l,itr_mass(B,1)) = (env%AqChems(1))*(env%numberofparticles*AqMolecularMass(1))/(Mgas/Av*airmw)	! convert mol/cm3 to kg/kg_air
+               tracerfire(i,j,l,itr_mass(B,1)) = (cur%AqChems(1))*AqMolecularMass(1)*part_conc*massemis*boxarea*dt*g_to_kg/boxmass
 
                ! AqChems
                DO PART = 2, HowManyAqChems
                   if (PART .EQ. iNH3aq) then
-                     tracer(i,j,l,ntrtrack) = (env%AqChems(PART))*(env%numberofparticles*AqMolecularMass(PART))/(Mgas/Av*airmw)	! convert mol/cm3 to kg/kg_air
-                     tracerfire(i,j,l,ntrtrack) = (cur%AqChems(PART))*AqMolecularMass(PART)*part_conc*massemis*boxarea*dt*g_to_kg/boxmass	
+                     tracer(i,j,l,itr_mass(B,PART)) = (env%AqChems(PART))*(env%numberofparticles*AqMolecularMass(PART))/(Mgas/Av*airmw)	! convert mol/cm3 to kg/kg_air
+                     tracerfire(i,j,l,itr_mass(B,PART)) = (cur%AqChems(PART))*AqMolecularMass(PART)*part_conc*massemis*boxarea*dt*g_to_kg/boxmass	
                   else
-                     tracer(i,j,l,ntrtrack) = (env%AqChems(PART))*(env%numberofparticles*AqMolecularMass(PART))/(Mgas/Av*airmw)	! convert mol/cm3 to kg/kg_air
-                     tracerfire(i,j,l,ntrtrack) = (SaltConc(PART)+cur%AqChems(PART))*AqMolecularMass(PART)*part_conc*massemis*boxarea*dt*g_to_kg/boxmass
+                     tracer(i,j,l,itr_mass(B,PART)) = (env%AqChems(PART))*(env%numberofparticles*AqMolecularMass(PART))/(Mgas/Av*airmw)	! convert mol/cm3 to kg/kg_air
+                     tracerfire(i,j,l,itr_mass(B,PART)) = (SaltConc(PART)+cur%AqChems(PART))*AqMolecularMass(PART)*part_conc*massemis*boxarea*dt*g_to_kg/boxmass
 
                   end if ! Be careful with NH3 to avoid double counting
-
-                  ntrtrack = ntrtrack+1
                ENDDO
 
                ! Anions and Cations
                DO PART = HowManyAqChems+1, NumAq
-                  tracer(i,j,l,ntrtrack) = 0.0
-                  tracerfire(i,j,l,ntrtrack) = 0.0
-                  ntrtrack = ntrtrack+1
+                  tracer(i,j,l,itr_mass(B,PART)) = 0.0
+                  tracerfire(i,j,l,itr_mass(B,PART)) = 0.0
                ENDDO
                
                !OrgChems
                DO PART = 1, HowManyOrgChems
-                  tracer(i,j,l,ntrtrack) = (env%OrgChems(PART))*(env%numberofparticles*OrgMolecularMass(PART))/(Mgas/Av*airmw)! convert ug/m3 to kg/kg_air
-                  tracerfire(i,j,l,ntrtrack) = cur%OrgChems(PART)*OrgMolecularMass(PART)*part_conc*massemis*boxarea*dt*g_to_kg/boxmass
-                  ntrtrack = ntrtrack+1
+                  tracer(i,j,l,itr_mass(B,nAq+PART)) = (env%OrgChems(PART))*(env%numberofparticles*OrgMolecularMass(PART))/(Mgas/Av*airmw)! convert ug/m3 to kg/kg_air
+                  tracerfire(i,j,l,itr_mass(B,nAq+PART)) = cur%OrgChems(PART)*OrgMolecularMass(PART)*part_conc*massemis*boxarea*dt*g_to_kg/boxmass
                ENDDO
         
                ! AqOrgChems
                DO PART =1, HowManyAqOrgChems
-                  tracer(i,j,l,ntrtrack) = (env%AqOrgChems(PART))*(env%numberofparticles*AqOrgMolecularMass(PART))/(Mgas/Av*airmw)! convert ug/m3 to kg/kg_air
-                  tracerfire(i,j,l,ntrtrack) = cur%AqOrgChems(PART)*AqOrgMolecularMass(PART)*part_conc*massemis*boxarea*dt*g_to_kg/boxmass
-                  ntrtrack = ntrtrack+1          
+                  tracer(i,j,l,itr_mass(B,nAq+nOrg+PART)) = (env%AqOrgChems(PART))*(env%numberofparticles*AqOrgMolecularMass(PART))/(Mgas/Av*airmw)! convert ug/m3 to kg/kg_air
+                  tracerfire(i,j,l,itr_mass(B,nAq+nOrg+PART)) = cur%AqOrgChems(PART)*AqOrgMolecularMass(PART)*part_conc*massemis*boxarea*dt*g_to_kg/boxmass
                ENDDO
 
                ! NumConc
