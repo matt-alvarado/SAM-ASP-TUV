@@ -63,12 +63,11 @@
       IMPLICIT NONE
 
       INCLUDE 'params'
+      INCLUDE 'samvrb'
 
 * input
 
       INTEGER nstr
-      LOGICAL lsamvb
-      COMMON /samvrb/ lsamvb
       INTEGER nz, iw
       REAL ag
       REAL zen
@@ -1155,8 +1154,6 @@ c     ..
 c     .. Scalar Arguments ..
 
       CHARACTER HEADER*127
-      LOGICAL lsamvb
-      COMMON /samvrb/ lsamvb
       LOGICAL   DELTAM, LAMBER, ONLYFL, PLANK, USRANG, USRTAU
       INTEGER   IBCND, MAXCLY, MAXCMU, MAXPHI, MAXULV, MAXUMU, NLYR,
      &          NPHI, NSTR, NTAU, NUMU

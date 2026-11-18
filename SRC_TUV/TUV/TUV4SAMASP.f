@@ -165,8 +165,7 @@
 
 * Per-call progress messages (tuv_set_verbose)
 
-      LOGICAL lsamvb
-      COMMON /samvrb/ lsamvb
+      INCLUDE 'samvrb'
 
       CHARACTER*1 again
 
@@ -312,10 +311,10 @@ c            dt_any(iz,iw) = 0.79*aircol(iz) * 2.e-17 ! N2 VUV absorption
 
          zen = sza(it)
 
-         WRITE(*,200) it, zen, esfact(it)
       IF (lsamvb) THEN
-         WRITE(kout,200) it, zen, esfact(it)
+         WRITE(*,200) it, zen, esfact(it)
       ENDIF
+         WRITE(kout,200) it, zen, esfact(it)
  200     FORMAT('step = ', I4,' sza = ', F9.3, 
      $        ' Earth-sun factor = ', F10.7)
 
@@ -1091,12 +1090,11 @@ c      CALL newlst(ns,slabel,nj,jlabel)
       END SUBROUTINE tuv4samasp_dims
 
 *=============================================================================*
-* Turn TUV's per-call progress messages (tuv4samasp, rtlink, psndo) on or off.
+* Turn TUV's per-call progress messages (tuv4samasp, rtlink) on or off.
 * Set by SAM from its namelist option samasp_verbose; off unless set.
       SUBROUTINE tuv_set_verbose(flag)
       IMPLICIT NONE
       LOGICAL flag
-      LOGICAL lsamvb
-      COMMON /samvrb/ lsamvb
+      INCLUDE 'samvrb'
       lsamvb = flag
       END

@@ -1,0 +1,7 @@
+* SAM-ASP verbose switch for TUV: when lsamvb is .TRUE., tuv4samasp and
+* rtlink print their per-call progress messages (to standard output).
+* Set by tuv_set_verbose from SAM's namelist option samasp_verbose
+* (params.f90); .FALSE. unless set.
+
+      LOGICAL lsamvb
+      COMMON /samvrb/ lsamvb

@@ -59,17 +59,21 @@ integer:: fire_k1 = 32, fire_k2 = 55
 ! ASP input-deck and output directories, relative to the run directory
 ! (each ends in '/'); passed to InitializeASP.
 character(256):: asp_deck_dir = 'SRC_TUV/ASP/InorganicInputDecks/'
+character(256):: asp_output_dir = 'SRC_TUV/ASP/OutputFiles/'
 ! Calendar year of the run; day0 and day are calendar days of that year as in
 ! SAM's CAM radiation (1.0 = 1 January 00 UTC). Used for TUV's date.
 integer:: year0 = 2009
 ! ASP (chemistry, aerosol) is run only where CO exceeds this (ppb), i.e. in
 ! the plume, after the fire emissions have stopped
 real:: asp_co_threshold_ppb = 130.
-! Print progress and diagnostic messages from tracers_physics, TUV and ASP
-! on every call (every cell, column or wavelength). Off by default: they add
-! tens of MB of log per short run and several percent to the run time.
+! Print per-call progress and diagnostic messages (to standard output):
+! tracers_physics' messages around each ASP and TUV call (with the photolysis
+! rates passed to ASP and the aerosol of the cell at i=12, l=30 before and
+! after ASP), TUV's per-call messages (tuv4samasp's step/solar
+! zenith angle line, rtlink; via tuv_set_verbose) and ASP's step messages
+! (StepPrints). Off by default: they add tens of MB of log per short run
+! and several percent to the run time.
 logical:: samasp_verbose = .false.
-character(256):: asp_output_dir = 'SRC_TUV/ASP/OutputFiles/'
 
 real(8):: tabs_s =0.	! surface temperature,K
 real:: delta_sst = 0.   ! amplitude of sin-pattern of sst about tabs_s (ocean_type=1)
